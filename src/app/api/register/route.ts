@@ -30,9 +30,17 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
+    const isDbUnavailable =
+      error instanceof Error &&
+      error.message.includes("Can't reach database server");
+
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Registration failed." },
-      { status: 500 }
+      {
+        error: isDbUnavailable
+          ? "Database is unavailable. Start Postgres and try again."
+          : "Registration failed.",
+      },
+      { status: isDbUnavailable ? 503 : 500 }
     );
   }
 }
