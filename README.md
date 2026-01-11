@@ -33,10 +33,26 @@ docker compose exec web npx prisma db push
 
 - Etherscan API ключ и адрес кошелька вводятся в интерфейсе Settings и хранятся в базе.
 - Значения не передаются в Docker Compose и не отображаются вне Settings.
+- `NEXTAUTH_SECRET` — обязательный секрет для подписи сессий.
+- `NEXTAUTH_URL` — публичный URL приложения.
+- `DATABASE_URL` — строка подключения к базе (используется всегда).
+- `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` — нужны, если используешь встроенный контейнер Postgres.
 - `ETHERSCAN_API_BASE` — базовый URL Etherscan API v2.
 - `ETHERSCAN_CHAIN_ID` — chain id (для Ethereum mainnet = 1).
 - `COINGECKO_API_BASE` — база CoinGecko (обычно не меняется).
 - `PRICE_BUCKET_SECONDS` — шаг кеширования цены (по умолчанию 3600 сек).
+
+## Timeweb Cloud Apps
+
+В панели Timeweb укажи переменные окружения (они попадут в контейнер):
+
+- `NEXTAUTH_SECRET`
+- `NEXTAUTH_URL`
+- `DATABASE_URL`
+- `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` (если используешь контейнер `db` из compose)
+- `ETHERSCAN_API_BASE`, `ETHERSCAN_CHAIN_ID`, `COINGECKO_API_BASE`, `PRICE_BUCKET_SECONDS` (по желанию)
+
+Если используешь внешний Postgres, отключи/удали сервис `db` из compose и оставь только `DATABASE_URL`.
 
 ## Синхронизация
 
