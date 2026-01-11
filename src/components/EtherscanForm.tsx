@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { useSettings } from "@/components/desktop/SettingsProvider";
 
-export default function EtherscanForm({ initialKey }: { initialKey: string }) {
+export default function EtherscanForm({ hasKey }: { hasKey: boolean }) {
   const { playSound } = useSettings();
-  const [apiKey, setApiKey] = useState(initialKey);
+  const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -47,6 +47,11 @@ export default function EtherscanForm({ initialKey }: { initialKey: string }) {
         spellCheck={false}
         required
       />
+      {hasKey ? (
+        <div className="muted">Ключ уже сохранен в базе.</div>
+      ) : (
+        <div className="muted">Ключ пока не задан.</div>
+      )}
       <div className="button-row">
         <button
           className="xp-button secondary"

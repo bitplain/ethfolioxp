@@ -66,7 +66,7 @@ export default async function DashboardPage() {
           content: (
             <div className="stack">
               <div className="notice">
-                Адрес: <strong>{wallet?.address || "не задан"}</strong>
+                {wallet?.address ? "Адрес сохранен" : "Адрес не задан"}
                 {lastSync ? (
                   <span className="muted">
                     {" "}Последняя операция: {lastSync.toLocaleString("ru-RU")}
@@ -100,7 +100,7 @@ export default async function DashboardPage() {
                   Ключ нужен для чтения транзакций. Используется при синхронизации
                   и сохраняется в базе.
                 </p>
-                <EtherscanForm initialKey={settings?.etherscanApiKey || ""} />
+                <EtherscanForm hasKey={Boolean(settings?.etherscanApiKey)} />
               </div>
               <div className="panel">
                 <div className="panel-title">Темы и звуки</div>
@@ -116,7 +116,7 @@ export default async function DashboardPage() {
     >
       <div className="stack">
         <div className="notice">
-          Адрес: <strong>{wallet?.address || "не задан"}</strong>
+          {wallet?.address ? "Адрес сохранен" : "Адрес не задан"}
           {lastSync ? (
             <span className="muted">
               {" "}Последняя операция: {lastSync.toLocaleString("ru-RU")}

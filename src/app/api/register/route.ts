@@ -28,17 +28,6 @@ export async function POST(request: Request) {
       data: { email, passwordHash },
     });
 
-    if (process.env.DEFAULT_WALLET_ADDRESS) {
-      await prisma.wallet.upsert({
-        where: { address: process.env.DEFAULT_WALLET_ADDRESS.toLowerCase() },
-        create: {
-          address: process.env.DEFAULT_WALLET_ADDRESS.toLowerCase(),
-          userId: user.id,
-        },
-        update: { userId: user.id },
-      });
-    }
-
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json(

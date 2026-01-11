@@ -198,9 +198,9 @@ export async function syncWallet(userId: string) {
   const settings = await prisma.userSettings.findUnique({
     where: { userId },
   });
-  const apiKey = settings?.etherscanApiKey || process.env.ETHERSCAN_API_KEY;
+  const apiKey = settings?.etherscanApiKey;
   if (!apiKey) {
-    throw new Error("ETHERSCAN_API_KEY is missing");
+    throw new Error("Etherscan API key is missing in settings.");
   }
 
   const address = normalizeAddress(wallet.address);

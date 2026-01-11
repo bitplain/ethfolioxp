@@ -4,7 +4,7 @@
 
 ## Локальный запуск через Docker
 
-1. Скопируй `.env.example` в `.env` и заполни ключи.
+1. Скопируй `.env.example` в `.env` и заполни системные переменные (например `NEXTAUTH_SECRET`).
 2. Запусти Postgres + Next.js (production режим внутри Docker):
 
 ```bash
@@ -31,7 +31,8 @@ docker compose exec web npx prisma db push
 
 ## Настройки
 
-- `ETHERSCAN_API_KEY` — ключ для чтения транзакций (используется как fallback).
+- Etherscan API ключ и адрес кошелька вводятся в интерфейсе Settings и хранятся в базе.
+- Значения не передаются в Docker Compose и не отображаются вне Settings.
 - `ETHERSCAN_API_BASE` — базовый URL Etherscan API v2.
 - `ETHERSCAN_CHAIN_ID` — chain id (для Ethereum mainnet = 1).
 - `COINGECKO_API_BASE` — база CoinGecko (обычно не меняется).

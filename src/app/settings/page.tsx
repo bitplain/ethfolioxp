@@ -35,7 +35,7 @@ export default async function SettingsPage() {
             Ключ нужен для чтения транзакций. Используется при синхронизации и
             сохраняется в базе.
           </p>
-          <EtherscanForm initialKey={settings?.etherscanApiKey || ""} />
+          <EtherscanForm hasKey={Boolean(settings?.etherscanApiKey)} />
         </div>
         <div className="panel">
           <div className="panel-title">Темы и звуки</div>
