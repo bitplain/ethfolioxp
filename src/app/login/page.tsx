@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useState } from "react";
-import DesktopShell from "@/components/desktop/DesktopShell";
 import { useSettings } from "@/components/desktop/SettingsProvider";
 
 export default function LoginPage() {
@@ -35,36 +34,57 @@ export default function LoginPage() {
   };
 
   return (
-    <DesktopShell
-      mainId="login"
-      mainTitle="Вход"
-      mainSubtitle="Авторизация пользователя"
-    >
-      <form className="stack" onSubmit={onSubmit}>
-        <input
-          className="xp-input"
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          required
-        />
-        <input
-          className="xp-input"
-          type="password"
-          placeholder="Пароль"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          required
-        />
-        {error ? <div className="notice">{error}</div> : null}
-        <button className="xp-button" type="submit" disabled={loading}>
-          {loading ? "Входим..." : "Войти"}
-        </button>
-        <p className="muted">
-          Нет аккаунта? <Link href="/register">Создать</Link>
-        </p>
-      </form>
-    </DesktopShell>
+    <div className="login-screen">
+      <div className="login-panel">
+        <div className="login-hero">
+          <div className="login-brand">
+            <span
+              className="login-brand-icon"
+              style={{ backgroundImage: "url(/icons/xp/window.png)" }}
+              aria-hidden
+            />
+            <div>
+              <div className="login-brand-title">RetroDesk</div>
+              <div className="login-brand-subtitle">XP-workspace для крипто-приложений</div>
+            </div>
+          </div>
+          <div className="login-greeting">
+            <div className="login-avatar" aria-hidden />
+            <div className="login-greeting-title">Добро пожаловать</div>
+            <div className="login-greeting-subtitle">
+              Войдите, чтобы открыть рабочий стол.
+            </div>
+          </div>
+        </div>
+        <div className="login-form">
+          <div className="login-form-header">Авторизация</div>
+          <form className="stack" onSubmit={onSubmit}>
+            <input
+              className="xp-input"
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+            <input
+              className="xp-input"
+              type="password"
+              placeholder="Пароль"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+            {error ? <div className="notice">{error}</div> : null}
+            <button className="xp-button" type="submit" disabled={loading}>
+              {loading ? "Входим..." : "Войти"}
+            </button>
+            <p className="muted">
+              Нет аккаунта? <Link href="/register">Создать</Link>
+            </p>
+          </form>
+        </div>
+      </div>
+    </div>
   );
 }

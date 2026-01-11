@@ -9,21 +9,50 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
-  const apiKey = String(body?.apiKey || "").trim();
+  try {
+    const body = await request.json();
+    const apiKey = String(body?.apiKey || "").trim();
 
-  if (!apiKey || apiKey.length < 20) {
+    if (!apiKey || apiKey.length < 20) {
+      return NextResponse.json(
+        { error: "Invalid Etherscan API key." },
+        { status: 400 }
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found. Please sign in again." },
+        { status: 401 }
+      );
+    }
+
+    await prisma.userSettings.upsert({
+      where: { userId: session.user.id },
+      create: { userId: session.user.id, etherscanApiKey: apiKey },
+      update: { etherscanApiKey: apiKey },
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const isDbUnavailable = message.includes("Can't reach database server");
+    const isMissingTable =
+      message.includes("UserSettings") && message.toLowerCase().includes("does not exist");
+
     return NextResponse.json(
-      { error: "Invalid Etherscan API key." },
-      { status: 400 }
+      {
+        error: isMissingTable
+          ? "Database schema is missing settings table. Run Prisma migrations."
+          : isDbUnavailable
+            ? "Database is unavailable. Start Postgres and try again."
+            : "Failed to save Etherscan key.",
+      },
+      { status: isDbUnavailable || isMissingTable ? 503 : 500 }
     );
   }
-
-  await prisma.userSettings.upsert({
-    where: { userId: session.user.id },
-    create: { userId: session.user.id, etherscanApiKey: apiKey },
-    update: { etherscanApiKey: apiKey },
-  });
-
-  return NextResponse.json({ ok: true });
 }

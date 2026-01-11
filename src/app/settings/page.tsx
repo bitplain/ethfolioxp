@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import DesktopShell from "@/components/desktop/DesktopShell";
 import EtherscanForm from "@/components/EtherscanForm";
+import ApiKeysForm from "@/components/ApiKeysForm";
 import WalletForm from "@/components/WalletForm";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -16,12 +17,18 @@ export default async function SettingsPage() {
     prisma.wallet.findFirst({ where: { userId: session.user.id } }),
     prisma.userSettings.findUnique({ where: { userId: session.user.id } }),
   ]);
+  const extraApiKeys = Array.isArray(settings?.apiKeys)
+    ? (settings?.apiKeys as { name: string; value: string }[])
+    : [];
+  const moralisApiKey = settings?.moralisApiKey ?? "";
 
   return (
     <DesktopShell
       mainId="settings"
       mainTitle="Настройки"
       mainSubtitle="Кошелек и синхронизация"
+      mainIcon="/icons/xp/monitor.png"
+      userEmail={session.user.email ?? null}
     >
       <div className="stack">
         <p className="muted">
@@ -37,6 +44,10 @@ export default async function SettingsPage() {
           </p>
           <EtherscanForm hasKey={Boolean(settings?.etherscanApiKey)} />
         </div>
+        <ApiKeysForm
+          initialMoralisKey={moralisApiKey}
+          initialKeys={extraApiKeys}
+        />
         <div className="panel">
           <div className="panel-title">Темы и звуки</div>
           <p className="muted">

@@ -1,5 +1,6 @@
 import { Prisma, TokenKind, TransferDirection } from "@prisma/client";
 import { prisma } from "./db";
+import { fetchUsdRubRate } from "./fx";
 
 const ETH_SYMBOL = "ETH";
 const ETH_NAME = "Ethereum";
@@ -10,6 +11,8 @@ const COINGECKO_API_BASE =
 const ETHERSCAN_API_BASE =
   process.env.ETHERSCAN_API_BASE || "https://api.etherscan.io/v2/api";
 const ETHERSCAN_CHAIN_ID = process.env.ETHERSCAN_CHAIN_ID || "1";
+const MORALIS_API_BASE = "https://deep-index.moralis.io/api/v2.2";
+const DEFAULT_MORALIS_API_KEY = process.env.MORALIS_API_KEY;
 
 type EtherscanResponse<T> = {
   status: string;
@@ -141,7 +144,11 @@ function pickClosestPrice(prices: [number, number][], targetMs: number) {
   return closest?.[1] ?? null;
 }
 
-async function fetchTokenPriceUsd(token: { kind: TokenKind; contractAddress: string }, bucketTs: number) {
+async function fetchTokenPrice(
+  token: { kind: TokenKind; contractAddress: string },
+  bucketTs: number,
+  currency: "usd" | "rub"
+) {
   const from = bucketTs - 3600;
   const to = bucketTs + 3600;
   const targetMs = bucketTs * 1000;
@@ -150,7 +157,7 @@ async function fetchTokenPriceUsd(token: { kind: TokenKind; contractAddress: str
     ? "/coins/ethereum/market_chart/range"
     : `/coins/ethereum/contract/${token.contractAddress}/market_chart/range`;
 
-  const url = `${COINGECKO_API_BASE}${endpoint}?vs_currency=usd&from=${from}&to=${to}`;
+  const url = `${COINGECKO_API_BASE}${endpoint}?vs_currency=${currency}&from=${from}&to=${to}`;
 
   try {
     const data = await fetchJson<{ prices: [number, number][] }>(url);
@@ -163,27 +170,157 @@ async function fetchTokenPriceUsd(token: { kind: TokenKind; contractAddress: str
   }
 }
 
-async function getPriceUsd(token: { id: string; kind: TokenKind; contractAddress: string }, timestampSec: number) {
+async function fetchMoralisPriceUsd(
+  contractAddress: string,
+  timestampSec: number,
+  apiKey?: string | null
+) {
+  const key = apiKey || DEFAULT_MORALIS_API_KEY;
+  if (!key) {
+    return null;
+  }
+
+  const toDate = new Date(timestampSec * 1000).toISOString();
+  const url =
+    `${MORALIS_API_BASE}/erc20/${contractAddress}/price?chain=eth&to_date=` +
+    encodeURIComponent(toDate);
+
+  try {
+    const response = await fetch(url, {
+      cache: "no-store",
+      headers: { "X-API-Key": key },
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const data = (await response.json()) as { usdPrice?: number | string };
+    const raw =
+      typeof data.usdPrice === "number" ? data.usdPrice : Number(data.usdPrice);
+    if (Number.isFinite(raw) && raw > 0) {
+      return raw;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+async function fetchDexscreenerPriceUsd(contractAddress: string) {
+  const url = `https://api.dexscreener.com/latest/dex/tokens/${contractAddress}`;
+
+  try {
+    const data = await fetchJson<{
+      pairs?: { priceUsd?: string; liquidity?: { usd?: number } }[];
+    }>(url);
+    const pairs = data?.pairs ?? [];
+    if (!pairs.length) {
+      return null;
+    }
+
+    const best = pairs
+      .filter((pair) => pair.priceUsd)
+      .sort(
+        (a, b) =>
+          (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0)
+      )[0];
+
+    if (!best?.priceUsd) {
+      return null;
+    }
+
+    const price = Number(best.priceUsd);
+    if (Number.isFinite(price) && price > 0) {
+      return price;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+async function getPrices(
+  token: { id: string; kind: TokenKind; contractAddress: string },
+  timestampSec: number,
+  options?: { moralisApiKey?: string | null }
+) {
   const bucketTs = Math.floor(timestampSec / PRICE_BUCKET_SECONDS) * PRICE_BUCKET_SECONDS;
   const cached = await prisma.priceSnapshot.findUnique({
     where: { tokenId_bucketTs: { tokenId: token.id, bucketTs } },
   });
 
   if (cached) {
-    return { priceUsd: cached.priceUsd, bucketTs };
+    if (cached.priceRub === null) {
+      const priceRubRaw = await fetchTokenPrice(token, bucketTs, "rub");
+      let priceRub =
+        priceRubRaw === null ? null : new Prisma.Decimal(priceRubRaw);
+
+      if (!priceRub) {
+        const fxRate = await fetchUsdRubRate(bucketTs);
+        if (fxRate) {
+          priceRub = cached.priceUsd.mul(fxRate);
+        }
+      }
+
+      if (priceRub) {
+        await prisma.priceSnapshot.update({
+          where: { tokenId_bucketTs: { tokenId: token.id, bucketTs } },
+          data: { priceRub },
+        });
+        return { priceUsd: cached.priceUsd, priceRub, bucketTs };
+      }
+    }
+
+    return { priceUsd: cached.priceUsd, priceRub: cached.priceRub, bucketTs };
   }
 
-  const price = await fetchTokenPriceUsd(token, bucketTs);
-  if (price === null) {
-    return { priceUsd: null, bucketTs };
+  let [priceUsdRaw, priceRubRaw] = await Promise.all([
+    fetchTokenPrice(token, bucketTs, "usd"),
+    fetchTokenPrice(token, bucketTs, "rub"),
+  ]);
+
+  if (priceUsdRaw === null && token.kind === TokenKind.ERC20) {
+    priceUsdRaw =
+      (await fetchMoralisPriceUsd(
+        token.contractAddress,
+        timestampSec,
+        options?.moralisApiKey
+      )) ??
+      (await fetchDexscreenerPriceUsd(token.contractAddress));
   }
 
-  const priceDecimal = new Prisma.Decimal(price);
+  let priceUsd =
+    priceUsdRaw === null ? null : new Prisma.Decimal(priceUsdRaw);
+  let priceRub = priceRubRaw === null ? null : new Prisma.Decimal(priceRubRaw);
+
+  if (!priceUsd && !priceRub) {
+    return { priceUsd: null, priceRub: null, bucketTs };
+  }
+
+  if (!priceRub && priceUsd) {
+    const fxRate = await fetchUsdRubRate(bucketTs);
+    if (fxRate) {
+      priceRub = priceUsd.mul(fxRate);
+    }
+  }
+
+  if (!priceUsd && priceRub) {
+    const fxRate = await fetchUsdRubRate(bucketTs);
+    if (fxRate) {
+      priceUsd = priceRub.div(fxRate);
+    }
+  }
+
+  if (!priceUsd) {
+    return { priceUsd: null, priceRub: null, bucketTs };
+  }
+
   await prisma.priceSnapshot.create({
-    data: { tokenId: token.id, bucketTs, priceUsd: priceDecimal },
+    data: { tokenId: token.id, bucketTs, priceUsd, priceRub },
   });
 
-  return { priceUsd: priceDecimal, bucketTs };
+  return { priceUsd, priceRub, bucketTs };
 }
 
 export async function syncWallet(userId: string) {
@@ -199,6 +336,7 @@ export async function syncWallet(userId: string) {
     where: { userId },
   });
   const apiKey = settings?.etherscanApiKey;
+  const moralisApiKey = settings?.moralisApiKey ?? DEFAULT_MORALIS_API_KEY;
   if (!apiKey) {
     throw new Error("Etherscan API key is missing in settings.");
   }
@@ -248,8 +386,13 @@ export async function syncWallet(userId: string) {
     const direction = from === address ? TransferDirection.OUT : TransferDirection.IN;
     const amount = toDecimalAmount(tx.value, 18);
     const timestampSec = Number(tx.timeStamp);
-    const { priceUsd } = await getPriceUsd(ethToken, timestampSec);
+    const { priceUsd, priceRub } = await getPrices(ethToken, timestampSec, {
+      moralisApiKey,
+    });
     const valueUsd = priceUsd ? priceUsd.mul(amount) : null;
+    const valueRub = priceRub ? priceRub.mul(amount) : null;
+
+    const ethKey = { txHash: tx.hash, tokenId: ethToken.id, logIndex: 0 };
 
     try {
       await prisma.transfer.create({
@@ -263,13 +406,20 @@ export async function syncWallet(userId: string) {
           amount,
           priceUsd,
           valueUsd,
-          logIndex: 0,
+          priceRub,
+          valueRub,
+          logIndex: ethKey.logIndex,
           source: "etherscan",
         },
       });
       created += 1;
     } catch {
-      // ignore duplicates
+      await prisma.transfer
+        .updateMany({
+          where: { ...ethKey, priceManual: false },
+          data: { priceUsd, valueUsd, priceRub, valueRub },
+        })
+        .catch(() => {});
     }
   }
 
@@ -293,8 +443,14 @@ export async function syncWallet(userId: string) {
       decimals,
     });
 
-    const { priceUsd } = await getPriceUsd(token, timestampSec);
+    const { priceUsd, priceRub } = await getPrices(token, timestampSec, {
+      moralisApiKey,
+    });
     const valueUsd = priceUsd ? priceUsd.mul(amount) : null;
+    const valueRub = priceRub ? priceRub.mul(amount) : null;
+
+    const logIndex = Number(tx.logIndex || 0);
+    const tokenKey = { txHash: tx.hash, tokenId: token.id, logIndex };
 
     try {
       await prisma.transfer.create({
@@ -308,15 +464,80 @@ export async function syncWallet(userId: string) {
           amount,
           priceUsd,
           valueUsd,
-          logIndex: Number(tx.logIndex || 0),
+          priceRub,
+          valueRub,
+          logIndex,
           source: "etherscan",
         },
       });
       created += 1;
     } catch {
-      // ignore duplicates
+      await prisma.transfer
+        .updateMany({
+          where: { ...tokenKey, priceManual: false },
+          data: { priceUsd, valueUsd, priceRub, valueRub },
+        })
+        .catch(() => {});
     }
   }
 
   return { created, ethCount: ethTxs.length, tokenCount: tokenTxs.length };
+}
+
+export async function backfillMissingPrices(userId: string) {
+  let scanned = 0;
+  let updated = 0;
+  let batches = 0;
+  const settings = await prisma.userSettings.findUnique({
+    where: { userId },
+  });
+  const moralisApiKey = settings?.moralisApiKey ?? DEFAULT_MORALIS_API_KEY;
+
+  while (batches < 5) {
+    const transfers = await prisma.transfer.findMany({
+      where: {
+        userId,
+        priceManual: false,
+        OR: [{ priceUsd: null }, { priceRub: null }],
+      },
+      include: { token: true },
+      orderBy: { blockTime: "asc" },
+      take: 150,
+    });
+
+    if (!transfers.length) {
+      break;
+    }
+
+    scanned += transfers.length;
+    let batchUpdated = 0;
+
+    for (const transfer of transfers) {
+      const timestampSec = Math.floor(transfer.blockTime.getTime() / 1000);
+      const { priceUsd, priceRub } = await getPrices(transfer.token, timestampSec, {
+        moralisApiKey,
+      });
+      if (!priceUsd && !priceRub) {
+        continue;
+      }
+
+      const valueUsd = priceUsd ? priceUsd.mul(transfer.amount) : null;
+      const valueRub = priceRub ? priceRub.mul(transfer.amount) : null;
+
+      await prisma.transfer.update({
+        where: { id: transfer.id },
+        data: { priceUsd, valueUsd, priceRub, valueRub },
+      });
+      updated += 1;
+      batchUpdated += 1;
+    }
+
+    if (batchUpdated === 0) {
+      break;
+    }
+
+    batches += 1;
+  }
+
+  return { scanned, updated };
 }

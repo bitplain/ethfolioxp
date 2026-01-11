@@ -64,6 +64,9 @@ model Transfer {
   amount    Decimal
   priceUsd  Decimal?
   valueUsd  Decimal?
+  priceRub  Decimal?
+  valueRub  Decimal?
+  priceManual Boolean  @default(false)
   logIndex  Int               @default(0)
   source    String
   createdAt DateTime          @default(now())
@@ -80,6 +83,7 @@ model PriceSnapshot {
   tokenId   String
   bucketTs  Int
   priceUsd  Decimal
+  priceRub  Decimal?
   createdAt DateTime @default(now())
 
   token Token @relation(fields: [tokenId], references: [id])
@@ -91,6 +95,8 @@ model UserSettings {
   id              String   @id @default(cuid())
   userId          String   @unique
   etherscanApiKey String?
+  moralisApiKey   String?
+  apiKeys         Json?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

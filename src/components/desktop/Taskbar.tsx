@@ -18,6 +18,8 @@ export default function Taskbar({
   onToggleWindow,
   onCascade,
   onTile,
+  userEmail,
+  onOpenAccount,
 }: {
   windows: TaskbarWindow[];
   activeId?: string;
@@ -26,6 +28,8 @@ export default function Taskbar({
   onToggleWindow: (id: string) => void;
   onCascade: () => void;
   onTile: () => void;
+  userEmail?: string;
+  onOpenAccount?: () => void;
 }) {
   const { theme, soundEnabled, toggleTheme, toggleSound, playSound } = useSettings();
   const [now, setNow] = useState(new Date());
@@ -82,47 +86,68 @@ export default function Taskbar({
         ))}
       </div>
       <div className="taskbar-right">
-        <button
-          className="taskbar-toggle"
-          type="button"
-          onClick={() => {
-            playSound("click");
-            onCascade();
-          }}
-        >
-          Cascade
-        </button>
-        <button
-          className="taskbar-toggle"
-          type="button"
-          onClick={() => {
-            playSound("click");
-            onTile();
-          }}
-        >
-          Tile
-        </button>
-        <button
-          className="taskbar-toggle"
-          type="button"
-          onClick={() => {
-            playSound("click");
-            toggleTheme();
-          }}
-        >
-          {theme === "light" ? "Luna" : "Night"}
-        </button>
-        <button
-          className="taskbar-toggle"
-          type="button"
-          onClick={() => {
-            playSound("click");
-            toggleSound();
-          }}
-        >
-          {soundEnabled ? "Sound: On" : "Sound: Off"}
-        </button>
-        <div className="taskbar-clock">{timeLabel}</div>
+        <div className="taskbar-controls">
+          <button
+            className="taskbar-toggle"
+            type="button"
+            onClick={() => {
+              playSound("click");
+              onCascade();
+            }}
+          >
+            Cascade
+          </button>
+          <button
+            className="taskbar-toggle"
+            type="button"
+            onClick={() => {
+              playSound("click");
+              onTile();
+            }}
+          >
+            Tile
+          </button>
+          <button
+            className="taskbar-toggle"
+            type="button"
+            onClick={() => {
+              playSound("click");
+              toggleTheme();
+            }}
+          >
+            {theme === "light" ? "Luna" : "Night"}
+          </button>
+          <button
+            className="taskbar-toggle"
+            type="button"
+            onClick={() => {
+              playSound("click");
+              toggleSound();
+            }}
+          >
+            {soundEnabled ? "Sound: On" : "Sound: Off"}
+          </button>
+        </div>
+        <div className="taskbar-tray">
+          {userEmail && onOpenAccount ? (
+            <button
+              className="tray-icon"
+              type="button"
+              title={userEmail}
+              onClick={() => {
+                playSound("click");
+                onOpenAccount();
+              }}
+            >
+              <span
+                className="tray-icon-image"
+                style={{ backgroundImage: "url(/icons/xp/user.svg)" }}
+                aria-hidden
+              />
+            </button>
+          ) : null}
+          <div className="taskbar-clock">{timeLabel}</div>
+        </div>
       </div>
     </div>
   );

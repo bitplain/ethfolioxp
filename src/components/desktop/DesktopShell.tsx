@@ -12,6 +12,7 @@ import CalculatorApp from "./apps/CalculatorApp";
 import ClockApp from "./apps/ClockApp";
 import AboutApp from "./apps/AboutApp";
 import SystemApp from "./apps/SystemApp";
+import AccountApp from "./apps/AccountApp";
 import {
   cascadeLayout,
   loadWindowLayout,
@@ -80,10 +81,11 @@ export default function DesktopShell({
   mainTitle,
   mainSubtitle,
   mainId = "ethfolio",
-  mainIcon = "/icons/xp/ethfolio.png",
+  mainIcon = "/icons/xp/monitor.png",
   mainDefaultOpen = true,
   mainCanClose = false,
   extraWindows,
+  userEmail,
 }: {
   children: React.ReactNode;
   mainTitle: string;
@@ -93,6 +95,7 @@ export default function DesktopShell({
   mainDefaultOpen?: boolean;
   mainCanClose?: boolean;
   extraWindows?: WindowConfig[];
+  userEmail?: string | null;
 }) {
   const router = useRouter();
   const { playSound } = useSettings();
@@ -140,6 +143,20 @@ export default function DesktopShell({
         ),
       },
       {
+        id: "account",
+        title: "User Account",
+        subtitle: "Профиль и пароль",
+        icon: "/icons/xp/user.svg",
+        content: userEmail ? (
+          <AccountApp email={userEmail} />
+        ) : (
+          <SystemApp
+            title="User Account"
+            message="Войди в аккаунт, чтобы изменить пароль."
+          />
+        ),
+      },
+      {
         id: "notepad",
         title: "Notepad",
         subtitle: "Быстрые заметки",
@@ -175,7 +192,7 @@ export default function DesktopShell({
         content: (
           <SystemApp
             title="My Computer"
-            message="Локальный диск (C:) · Пользовательские файлы · Ethfolio"
+            message="Локальный диск (C:) · Пользовательские файлы · RetroDesk"
           />
         ),
       },
@@ -239,7 +256,17 @@ export default function DesktopShell({
       (item) => !baseConfigs.some((base) => base.id === item.id)
     );
     return [...merged, ...extraOnly];
-  }, [children, extraWindows, mainId, mainSubtitle, mainTitle]);
+  }, [
+    children,
+    extraWindows,
+    mainId,
+    mainSubtitle,
+    mainTitle,
+    mainIcon,
+    mainDefaultOpen,
+    mainCanClose,
+    userEmail,
+  ]);
 
   const [windows, setWindows] = useState<WindowState[]>(() =>
     createInitialState(windowConfigs)
@@ -502,7 +529,7 @@ export default function DesktopShell({
       id: "start-ethfolio",
       label: "Ethfolio",
       description: "Открыть портфель",
-      icon: "/icons/xp/ethfolio.png",
+      icon: "/icons/xp/eth.svg",
       action: ethfolioAction,
     },
     {
@@ -592,7 +619,7 @@ export default function DesktopShell({
       id: "program-ethfolio",
       label: "Ethfolio",
       description: "Основное окно",
-      icon: "/icons/xp/ethfolio.png",
+      icon: "/icons/xp/eth.svg",
       action: ethfolioAction,
     },
     {
@@ -768,6 +795,7 @@ export default function DesktopShell({
         onTile={tileWindows}
         onClose={() => setStartOpen(false)}
         onOpenWindow={openWindow}
+        userEmail={userEmail}
       />
       <Taskbar
         windows={openWindows.map((config) => {
@@ -785,6 +813,8 @@ export default function DesktopShell({
         onToggleWindow={toggleMinimize}
         onCascade={cascadeWindows}
         onTile={tileWindows}
+        userEmail={userEmail ?? undefined}
+        onOpenAccount={() => openWindow("account")}
       />
     </div>
   );

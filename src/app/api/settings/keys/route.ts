@@ -1,14 +1,21 @@
+import { Prisma } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
-function normalizeAddress(address: string) {
-  return address.trim().toLowerCase();
-}
+type ApiKeyEntry = { name: string; value: string };
 
-function isValidAddress(address: string) {
-  return /^0x[a-f0-9]{40}$/.test(address);
+function sanitizeKeys(raw: unknown): ApiKeyEntry[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw
+    .map((entry) => ({
+      name: String((entry as ApiKeyEntry)?.name || "").trim(),
+      value: String((entry as ApiKeyEntry)?.value || "").trim(),
+    }))
+    .filter((entry) => entry.name && entry.value);
 }
 
 export async function POST(request: Request) {
@@ -19,11 +26,8 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const address = normalizeAddress(String(body?.address || ""));
-
-    if (!isValidAddress(address)) {
-      return NextResponse.json({ error: "Invalid address." }, { status: 400 });
-    }
+    const moralisApiKey = String(body?.moralisApiKey || "").trim();
+    const apiKeys = sanitizeKeys(body?.apiKeys);
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
@@ -36,28 +40,18 @@ export async function POST(request: Request) {
       );
     }
 
-    const other = await prisma.wallet.findUnique({ where: { address } });
-    if (other && other.userId !== session.user.id) {
-      return NextResponse.json(
-        { error: "Address is already linked to another user." },
-        { status: 409 }
-      );
-    }
-
-    const existing = await prisma.wallet.findFirst({
+    await prisma.userSettings.upsert({
       where: { userId: session.user.id },
+      create: {
+        userId: session.user.id,
+        moralisApiKey: moralisApiKey || null,
+        apiKeys: apiKeys.length ? apiKeys : Prisma.JsonNull,
+      },
+      update: {
+        moralisApiKey: moralisApiKey || null,
+        apiKeys: apiKeys.length ? apiKeys : Prisma.JsonNull,
+      },
     });
-
-    if (existing) {
-      await prisma.wallet.update({
-        where: { id: existing.id },
-        data: { address },
-      });
-    } else {
-      await prisma.wallet.create({
-        data: { address, userId: session.user.id },
-      });
-    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {
@@ -69,7 +63,7 @@ export async function POST(request: Request) {
       {
         error: isDbUnavailable
           ? "Database is unavailable. Start Postgres and try again."
-          : "Wallet save failed.",
+          : "Failed to save API keys.",
       },
       { status: isDbUnavailable ? 503 : 500 }
     );

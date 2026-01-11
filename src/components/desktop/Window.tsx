@@ -14,6 +14,10 @@ type DragState = {
   startY?: number;
 };
 
+type ResizeDirection = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
+const TASKBAR_HEIGHT = 44;
+const WINDOW_MARGIN = 12;
+
 type WindowProps = {
   id: string;
   title: string;
@@ -58,9 +62,13 @@ export default function Window({
   children,
 }: WindowProps) {
   const dragState = useRef<DragState | null>(null);
-  const resizeState = useRef<{ startX: number; startY: number; size: Size } | null>(
-    null
-  );
+  const resizeState = useRef<{
+    startX: number;
+    startY: number;
+    size: Size;
+    position: Position;
+    direction: ResizeDirection;
+  } | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -69,14 +77,32 @@ export default function Window({
     if (isMaximized) {
       return;
     }
-    const maxWidth = Math.min(window.innerWidth - 80, 980);
-    const maxHeight = Math.min(window.innerHeight - 160, 720);
+    const viewWidth = window.innerWidth;
+    const viewHeight = window.innerHeight - TASKBAR_HEIGHT;
+    const maxWidth = Math.max(160, viewWidth - WINDOW_MARGIN * 2);
+    const maxHeight = Math.max(200, viewHeight - WINDOW_MARGIN * 2);
     const nextWidth = Math.min(size.width, maxWidth);
     const nextHeight = Math.min(size.height, maxHeight);
     if (nextWidth !== size.width || nextHeight !== size.height) {
       onSizeChange(id, { width: nextWidth, height: nextHeight });
     }
-  }, [id, isMaximized, onSizeChange, size.height, size.width]);
+    const maxX = Math.max(WINDOW_MARGIN, viewWidth - nextWidth - WINDOW_MARGIN);
+    const maxY = Math.max(WINDOW_MARGIN, viewHeight - nextHeight - WINDOW_MARGIN);
+    const nextX = Math.min(Math.max(position.x, WINDOW_MARGIN), maxX);
+    const nextY = Math.min(Math.max(position.y, WINDOW_MARGIN), maxY);
+    if (nextX !== position.x || nextY !== position.y) {
+      onPositionChange(id, { x: nextX, y: nextY });
+    }
+  }, [
+    id,
+    isMaximized,
+    onPositionChange,
+    onSizeChange,
+    position.x,
+    position.y,
+    size.height,
+    size.width,
+  ]);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest(".window-controls")) {
@@ -136,7 +162,15 @@ export default function Window({
       x: event.clientX - dragState.current.offsetX,
       y: event.clientY - dragState.current.offsetY,
     };
-    onPositionChange(id, next);
+    const viewWidth = typeof window !== "undefined" ? window.innerWidth : 1024;
+    const viewHeight =
+      typeof window !== "undefined" ? window.innerHeight - TASKBAR_HEIGHT : 768;
+    const maxX = Math.max(WINDOW_MARGIN, viewWidth - size.width - WINDOW_MARGIN);
+    const maxY = Math.max(WINDOW_MARGIN, viewHeight - size.height - WINDOW_MARGIN);
+    onPositionChange(id, {
+      x: Math.min(Math.max(next.x, WINDOW_MARGIN), maxX),
+      y: Math.min(Math.max(next.y, WINDOW_MARGIN), maxY),
+    });
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -144,15 +178,19 @@ export default function Window({
     event.currentTarget.releasePointerCapture(event.pointerId);
   };
 
-  const handleResizeStart = (event: React.PointerEvent<HTMLDivElement>) => {
+  const handleResizeStart =
+    (direction: ResizeDirection) => (event: React.PointerEvent<HTMLDivElement>) => {
     if (isMaximized) {
       return;
     }
     event.stopPropagation();
+    onFocus(id);
     resizeState.current = {
       startX: event.clientX,
       startY: event.clientY,
       size,
+      position,
+      direction,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
@@ -161,11 +199,55 @@ export default function Window({
     if (!resizeState.current) {
       return;
     }
-    const dx = event.clientX - resizeState.current.startX;
-    const dy = event.clientY - resizeState.current.startY;
-    const nextWidth = Math.max(420, resizeState.current.size.width + dx);
-    const nextHeight = Math.max(320, resizeState.current.size.height + dy);
+    const { startX, startY, size: startSize, position: startPos, direction } =
+      resizeState.current;
+    const viewWidth = typeof window !== "undefined" ? window.innerWidth : 1024;
+    const viewHeight =
+      typeof window !== "undefined" ? window.innerHeight - TASKBAR_HEIGHT : 768;
+    const maxWidth = Math.max(160, viewWidth - WINDOW_MARGIN * 2);
+    const maxHeight = Math.max(200, viewHeight - WINDOW_MARGIN * 2);
+    const minWidth = Math.min(420, maxWidth);
+    const minHeight = Math.min(320, maxHeight);
+    const dx = event.clientX - startX;
+    const dy = event.clientY - startY;
+
+    let nextWidth = startSize.width;
+    let nextHeight = startSize.height;
+    let nextX = startPos.x;
+    let nextY = startPos.y;
+
+    if (direction.includes("e")) {
+      nextWidth = startSize.width + dx;
+    }
+    if (direction.includes("s")) {
+      nextHeight = startSize.height + dy;
+    }
+    if (direction.includes("w")) {
+      nextWidth = startSize.width - dx;
+    }
+    if (direction.includes("n")) {
+      nextHeight = startSize.height - dy;
+    }
+
+    nextWidth = Math.min(Math.max(minWidth, nextWidth), maxWidth);
+    nextHeight = Math.min(Math.max(minHeight, nextHeight), maxHeight);
+
+    if (direction.includes("w")) {
+      nextX = startPos.x + (startSize.width - nextWidth);
+    }
+    if (direction.includes("n")) {
+      nextY = startPos.y + (startSize.height - nextHeight);
+    }
+
+    const maxX = Math.max(WINDOW_MARGIN, viewWidth - nextWidth - WINDOW_MARGIN);
+    const maxY = Math.max(WINDOW_MARGIN, viewHeight - nextHeight - WINDOW_MARGIN);
+    nextX = Math.min(Math.max(nextX, WINDOW_MARGIN), maxX);
+    nextY = Math.min(Math.max(nextY, WINDOW_MARGIN), maxY);
+
     onSizeChange(id, { width: nextWidth, height: nextHeight });
+    if (nextX !== startPos.x || nextY !== startPos.y) {
+      onPositionChange(id, { x: nextX, y: nextY });
+    }
   };
 
   const handleResizeEnd = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -229,12 +311,17 @@ export default function Window({
         </div>
       </div>
       <div className="window-content">{children}</div>
-      <div
-        className="window-resize"
-        onPointerDown={handleResizeStart}
-        onPointerMove={handleResizeMove}
-        onPointerUp={handleResizeEnd}
-      />
+      {(["n", "s", "e", "w", "ne", "nw", "se", "sw"] as ResizeDirection[]).map(
+        (direction) => (
+          <div
+            key={direction}
+            className={`window-resize ${direction}`}
+            onPointerDown={handleResizeStart(direction)}
+            onPointerMove={handleResizeMove}
+            onPointerUp={handleResizeEnd}
+          />
+        )
+      )}
     </section>
   );
 }
