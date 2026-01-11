@@ -1,0 +1,33 @@
+{
+  "name": "eth-portfolio",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "predev": "prisma generate",
+    "dev": "next dev -H 0.0.0.0 -p 3000",
+    "prebuild": "prisma generate",
+    "build": "next build",
+    "start": "next start -H 0.0.0.0 -p 3000",
+    "lint": "next lint",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.16.2",
+    "bcryptjs": "^2.4.3",
+    "next": "^14.2.5",
+    "next-auth": "^4.24.7",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.14.9",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "prisma": "^5.16.2",
+    "typescript": "^5.5.3"
+  }
+}

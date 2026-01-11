@@ -1,0 +1,98 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TokenKind {
+  ETH
+  ERC20
+}
+
+enum TransferDirection {
+  IN
+  OUT
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  createdAt    DateTime   @default(now())
+  wallets      Wallet[]
+  tokens       Token[]
+  transfers    Transfer[]
+  settings     UserSettings?
+}
+
+model Wallet {
+  id        String     @id @default(cuid())
+  userId    String
+  address   String     @unique
+  createdAt DateTime   @default(now())
+  user      User       @relation(fields: [userId], references: [id])
+  transfers Transfer[]
+}
+
+model Token {
+  id              String          @id @default(cuid())
+  userId          String
+  kind            TokenKind       @default(ERC20)
+  contractAddress String
+  symbol          String
+  name            String
+  decimals        Int?
+  createdAt       DateTime        @default(now())
+  user            User            @relation(fields: [userId], references: [id])
+  transfers       Transfer[]
+  priceSnapshots  PriceSnapshot[]
+
+  @@unique([userId, kind, contractAddress])
+}
+
+model Transfer {
+  id        String            @id @default(cuid())
+  userId    String
+  walletId  String
+  tokenId   String
+  txHash    String
+  blockTime DateTime
+  direction TransferDirection
+  amount    Decimal
+  priceUsd  Decimal?
+  valueUsd  Decimal?
+  logIndex  Int               @default(0)
+  source    String
+  createdAt DateTime          @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  wallet Wallet @relation(fields: [walletId], references: [id])
+  token  Token  @relation(fields: [tokenId], references: [id])
+
+  @@unique([txHash, tokenId, logIndex])
+}
+
+model PriceSnapshot {
+  id        String   @id @default(cuid())
+  tokenId   String
+  bucketTs  Int
+  priceUsd  Decimal
+  createdAt DateTime @default(now())
+
+  token Token @relation(fields: [tokenId], references: [id])
+
+  @@unique([tokenId, bucketTs])
+}
+
+model UserSettings {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  etherscanApiKey String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}
