@@ -12,12 +12,14 @@ import CalculatorApp from "./apps/CalculatorApp";
 import ClockApp from "./apps/ClockApp";
 import AboutApp from "./apps/AboutApp";
 import SystemApp from "./apps/SystemApp";
+import AccountApp from "./apps/AccountApp";
 import {
   cascadeLayout,
   loadWindowLayout,
   saveWindowLayout,
   tileLayout,
 } from "@/lib/windowLayouts";
+import { debounce } from "@/lib/debounce";
 
 type WindowConfig = {
   id: string;
@@ -80,10 +82,11 @@ export default function DesktopShell({
   mainTitle,
   mainSubtitle,
   mainId = "ethfolio",
-  mainIcon = "/icons/xp/ethfolio.png",
+  mainIcon = "/icons/xp/monitor.png",
   mainDefaultOpen = true,
   mainCanClose = false,
   extraWindows,
+  userEmail,
 }: {
   children: React.ReactNode;
   mainTitle: string;
@@ -93,6 +96,7 @@ export default function DesktopShell({
   mainDefaultOpen?: boolean;
   mainCanClose?: boolean;
   extraWindows?: WindowConfig[];
+  userEmail?: string | null;
 }) {
   const router = useRouter();
   const { playSound } = useSettings();
@@ -103,6 +107,7 @@ export default function DesktopShell({
     y: number;
   }>({ open: false, x: 0, y: 0 });
   const zCounter = useRef(100);
+  const saveLayout = useMemo(() => debounce(saveWindowLayout, 250), []);
 
   const windowConfigs = useMemo<WindowConfig[]>(() => {
     const baseConfigs: WindowConfig[] = [
@@ -136,6 +141,20 @@ export default function DesktopShell({
           <SystemApp
             title="Settings"
             message="Открой портфель, чтобы изменить настройки."
+          />
+        ),
+      },
+      {
+        id: "account",
+        title: "User Account",
+        subtitle: "Профиль и пароль",
+        icon: "/icons/xp/user.svg",
+        content: userEmail ? (
+          <AccountApp email={userEmail} />
+        ) : (
+          <SystemApp
+            title="User Account"
+            message="Войди в аккаунт, чтобы изменить пароль."
           />
         ),
       },
@@ -175,7 +194,7 @@ export default function DesktopShell({
         content: (
           <SystemApp
             title="My Computer"
-            message="Локальный диск (C:) · Пользовательские файлы · Ethfolio"
+            message="Локальный диск (C:) · Пользовательские файлы · RetroDesk"
           />
         ),
       },
@@ -239,7 +258,17 @@ export default function DesktopShell({
       (item) => !baseConfigs.some((base) => base.id === item.id)
     );
     return [...merged, ...extraOnly];
-  }, [children, extraWindows, mainId, mainSubtitle, mainTitle]);
+  }, [
+    children,
+    extraWindows,
+    mainId,
+    mainSubtitle,
+    mainTitle,
+    mainIcon,
+    mainDefaultOpen,
+    mainCanClose,
+    userEmail,
+  ]);
 
   const [windows, setWindows] = useState<WindowState[]>(() =>
     createInitialState(windowConfigs)
@@ -318,17 +347,18 @@ export default function DesktopShell({
   };
 
   const toggleMinimize = (id: string) => {
-    playSound("click");
     setWindows((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              isMinimized: !item.isMinimized,
-              zIndex: item.isMinimized ? ++zCounter.current : item.zIndex,
-            }
-          : item
-      )
+      prev.map((item) => {
+        if (item.id !== id) {
+          return item;
+        }
+        playSound(item.isMinimized ? "restore" : "minimize");
+        return {
+          ...item,
+          isMinimized: !item.isMinimized,
+          zIndex: item.isMinimized ? ++zCounter.current : item.zIndex,
+        };
+      })
     );
   };
 
@@ -355,7 +385,7 @@ export default function DesktopShell({
   };
 
   const toggleMaximize = (id: string) => {
-    playSound("click");
+    playSound("restore");
     setWindows((prev) =>
       prev.map((item) => {
         if (item.id !== id) {
@@ -400,8 +430,9 @@ export default function DesktopShell({
       isMinimized: item.isMinimized,
       isMaximized: item.isMaximized,
     }));
-    saveWindowLayout(payload);
-  }, [windows]);
+    saveLayout(payload);
+    return () => saveLayout.cancel();
+  }, [saveLayout, windows]);
 
   const cascadeWindows = () => {
     const openIds = windows.filter((item) => item.isOpen).map((item) => item.id);
@@ -502,7 +533,7 @@ export default function DesktopShell({
       id: "start-ethfolio",
       label: "Ethfolio",
       description: "Открыть портфель",
-      icon: "/icons/xp/ethfolio.png",
+      icon: "/icons/xp/eth.svg",
       action: ethfolioAction,
     },
     {
@@ -592,7 +623,7 @@ export default function DesktopShell({
       id: "program-ethfolio",
       label: "Ethfolio",
       description: "Основное окно",
-      icon: "/icons/xp/ethfolio.png",
+      icon: "/icons/xp/eth.svg",
       action: ethfolioAction,
     },
     {
@@ -768,6 +799,7 @@ export default function DesktopShell({
         onTile={tileWindows}
         onClose={() => setStartOpen(false)}
         onOpenWindow={openWindow}
+        userEmail={userEmail}
       />
       <Taskbar
         windows={openWindows.map((config) => {
@@ -785,6 +817,8 @@ export default function DesktopShell({
         onToggleWindow={toggleMinimize}
         onCascade={cascadeWindows}
         onTile={tileWindows}
+        userEmail={userEmail ?? undefined}
+        onOpenAccount={() => openWindow("account")}
       />
     </div>
   );

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSettings } from "@/components/desktop/SettingsProvider";
+import { postJson } from "@/lib/http";
 
 export default function SyncButton() {
   const { playSound } = useSettings();
@@ -12,22 +13,28 @@ export default function SyncButton() {
     playSound("click");
     setLoading(true);
     setMessage(null);
-    const response = await fetch("/api/sync", { method: "POST" });
-    const data = await response.json().catch(() => ({}));
+    try {
+      const result = await postJson("/api/sync");
 
-    if (!response.ok) {
-      setMessage(data.error || "Ошибка синхронизации");
+      if (!result.ok) {
+        const errorMessage =
+          result.data.error ||
+          (result.error
+            ? "Ошибка сети. Проверь соединение."
+            : "Ошибка синхронизации");
+        setMessage(errorMessage);
+        return;
+      }
+
+      playSound("notify");
+      setMessage(`Синхронизировано: +${result.data.created ?? 0} записей.`);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    playSound("notify");
-    setMessage(`Синхронизировано: +${data.created} записей.`);
-    setLoading(false);
   };
 
   return (
-    <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+    <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
       <button className="xp-button" onClick={onSync} disabled={loading}>
         {loading ? "Синхронизация..." : "Синхронизировать"}
       </button>

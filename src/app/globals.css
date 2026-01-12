@@ -4,8 +4,8 @@
   --font-display: "Trebuchet MS", "Tahoma", sans-serif;
   --text: #0c0f1a;
   --muted: #384152;
-  --desktop-bg: linear-gradient(180deg, #7fc4ff 0%, #4d8fe0 45%, #2f5ea8 100%);
-  --desktop-horizon: linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent 45%);
+  --desktop-bg: url("/wallpapers/windows-xp.jpg") center / cover no-repeat;
+  --desktop-horizon: none;
   --taskbar-bg: linear-gradient(180deg, #2a7be4 0%, #1b56c6 100%);
   --taskbar-edge: #0e3e8d;
   --window-bg: #fefefe;
@@ -30,8 +30,8 @@
   color-scheme: dark;
   --text: #f5f7ff;
   --muted: #b7c3da;
-  --desktop-bg: linear-gradient(180deg, #1b2f55 0%, #0f1f3f 55%, #0a152d 100%);
-  --desktop-horizon: linear-gradient(180deg, rgba(82, 138, 255, 0.2), transparent 50%);
+  --desktop-bg: url("/wallpapers/windows-xp.jpg") center / cover no-repeat;
+  --desktop-horizon: none;
   --taskbar-bg: linear-gradient(180deg, #1e2f58 0%, #14264b 100%);
   --taskbar-edge: #0b1633;
   --window-bg: #101829;
@@ -101,26 +101,128 @@ textarea {
   pointer-events: none;
 }
 
-.desktop-wallpaper::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: var(--desktop-horizon);
-  opacity: 0.9;
-  pointer-events: none;
+.desktop-wallpaper::after,
+.desktop-wallpaper::before {
+  content: none;
 }
 
-.desktop-wallpaper::before {
-  content: "";
-  position: absolute;
-  left: -10%;
-  right: -10%;
-  bottom: -20%;
-  height: 55%;
-  background: radial-gradient(circle at 30% 40%, #4cc84a 0%, #23863c 45%, #0f5a2f 70%);
-  border-radius: 50% 50% 0 0;
-  opacity: 0.95;
-  filter: saturate(1.1);
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: radial-gradient(circle at 20% 20%, #d6ecff 0%, #7fb7f7 40%, #2d5fa8 100%);
+}
+
+.login-panel {
+  width: min(860px, 94vw);
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  background: #eff6ff;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 2px solid #2f63b1;
+  box-shadow: 0 28px 60px rgba(9, 18, 40, 0.35);
+}
+
+.login-hero {
+  padding: 36px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 28px;
+  color: #f8fbff;
+  background: linear-gradient(150deg, #3e7bd7 0%, #1f4f9f 60%, #123a7d 100%);
+}
+
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.login-brand-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+
+.login-brand-title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.login-brand-subtitle {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.login-greeting {
+  display: grid;
+  gap: 8px;
+}
+
+.login-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.2) url("/icons/xp/user.svg") center/40px no-repeat;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: inset 0 0 0 1px rgba(11, 24, 54, 0.2);
+}
+
+.login-greeting-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.login-greeting-subtitle {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.login-form {
+  padding: 34px 32px;
+  background: var(--window-bg);
+  border-left: 1px solid var(--panel-border);
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+
+.login-form-header {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1a2b4d;
+}
+
+[data-theme="dark"] .login-screen {
+  background: radial-gradient(circle at 20% 20%, #25345c 0%, #13264c 50%, #0a1530 100%);
+}
+
+[data-theme="dark"] .login-panel {
+  background: #0e1b36;
+  border-color: #28477f;
+}
+
+[data-theme="dark"] .login-hero {
+  background: linear-gradient(150deg, #24407a 0%, #182c59 60%, #101f44 100%);
+}
+
+[data-theme="dark"] .login-form {
+  background: #101829;
+  border-left-color: #263c65;
+}
+
+[data-theme="dark"] .login-form-header {
+  color: #e9f0ff;
 }
 
 .desktop-icons {
@@ -197,7 +299,7 @@ textarea {
 
 .variant-app .desktop-icon-glyph {
   background-color: transparent;
-  background-image: url("/icons/xp/ethfolio.png");
+  background-image: url("/icons/xp/eth.svg");
 }
 
 .desktop-windows {
@@ -211,6 +313,9 @@ textarea {
   position: absolute;
   top: 0;
   left: 0;
+  display: flex;
+  flex-direction: column;
+  container-type: inline-size;
   background: var(--window-bg);
   border: 2px solid var(--window-border);
   border-radius: 10px;
@@ -229,6 +334,7 @@ textarea {
 }
 
 .window-header {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -324,18 +430,79 @@ textarea {
 
 .window-content {
   padding: 24px;
-  height: calc(100% - 60px);
+  flex: 1;
+  min-height: 0;
   overflow: auto;
 }
 
 .window-resize {
   position: absolute;
-  right: 4px;
-  bottom: 4px;
-  width: 18px;
-  height: 18px;
+  z-index: 2;
+}
+
+.window-resize.n {
+  top: 0;
+  left: 10px;
+  right: 10px;
+  height: 6px;
+  cursor: n-resize;
+}
+
+.window-resize.s {
+  bottom: 0;
+  left: 10px;
+  right: 10px;
+  height: 6px;
+  cursor: s-resize;
+}
+
+.window-resize.e {
+  top: 10px;
+  right: 0;
+  bottom: 10px;
+  width: 6px;
+  cursor: e-resize;
+}
+
+.window-resize.w {
+  top: 10px;
+  left: 0;
+  bottom: 10px;
+  width: 6px;
+  cursor: w-resize;
+}
+
+.window-resize.ne {
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  cursor: ne-resize;
+}
+
+.window-resize.nw {
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nw-resize;
+}
+
+.window-resize.se {
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
   cursor: se-resize;
   background: linear-gradient(135deg, transparent 40%, rgba(255, 255, 255, 0.6));
+}
+
+.window-resize.sw {
+  left: 0;
+  bottom: 0;
+  width: 12px;
+  height: 12px;
+  cursor: sw-resize;
 }
 
 .window.is-maximized .window-resize {
@@ -479,6 +646,16 @@ textarea {
   font-size: 0.9rem;
 }
 
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.table-scroll .xp-table {
+  min-width: 760px;
+}
+
 .xp-table th,
 .xp-table td {
   border-bottom: 1px solid var(--panel-border);
@@ -565,6 +742,12 @@ textarea {
   gap: 10px;
 }
 
+.taskbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .taskbar-toggle {
   background: rgba(255, 255, 255, 0.18);
   border: 1px solid rgba(7, 15, 34, 0.5);
@@ -572,6 +755,47 @@ textarea {
   padding: 6px 10px;
   border-radius: 6px;
   font-size: 0.8rem;
+}
+
+.taskbar-tray {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: linear-gradient(180deg, rgba(58, 123, 228, 0.7) 0%, rgba(16, 72, 168, 0.85) 100%);
+  border: 1px solid rgba(9, 24, 55, 0.6);
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+[data-theme="dark"] .taskbar-tray {
+  background: linear-gradient(180deg, rgba(38, 68, 130, 0.65) 0%, rgba(19, 39, 84, 0.9) 100%);
+  border-color: rgba(6, 12, 28, 0.7);
+}
+
+.tray-icon {
+  width: 26px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  padding: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.tray-icon:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.tray-icon-image {
+  width: 18px;
+  height: 18px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .taskbar-clock {
@@ -584,11 +808,11 @@ textarea {
   position: fixed;
   bottom: 44px;
   left: 12px;
-  width: 280px;
+  width: 320px;
   display: grid;
   grid-template-rows: auto 1fr auto;
-  background: rgba(19, 32, 62, 0.92);
-  border: 2px solid #1b3568;
+  background: rgba(16, 28, 56, 0.95);
+  border: 2px solid #1f3e78;
   border-radius: 10px;
   box-shadow: 0 20px 40px rgba(5, 10, 25, 0.6);
   z-index: 10;
@@ -598,13 +822,44 @@ textarea {
 
 .start-menu-header {
   background: linear-gradient(180deg, #3a6ed0 0%, #234b9f 100%);
-  padding: 10px 14px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-weight: 700;
 }
 
+.start-menu-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.start-menu-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.25) url("/icons/xp/user.svg") center/22px
+    no-repeat;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.start-menu-username {
+  font-size: 0.95rem;
+  font-weight: 700;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.start-menu-brand {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
 .start-menu-body {
-  display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
+  display: flex;
   gap: 10px;
   padding: 10px;
 }
@@ -616,13 +871,15 @@ textarea {
 }
 
 .start-menu-left {
-  background: rgba(16, 36, 74, 0.65);
+  flex: 1.1;
+  background: rgba(15, 30, 62, 0.65);
   border-radius: 10px;
   padding: 6px;
 }
 
 .start-menu-right {
-  background: rgba(240, 244, 255, 0.92);
+  flex: 0.9;
+  background: rgba(240, 244, 255, 0.95);
   color: #1b2540;
   border-radius: 10px;
   padding: 6px;
@@ -719,9 +976,82 @@ textarea {
 
 .start-menu-footer {
   border-top: 1px solid rgba(255, 255, 255, 0.15);
-  padding: 8px 12px;
+  padding: 10px 12px;
   font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.start-menu-action {
+  background: linear-gradient(180deg, #fefefe 0%, #e1e9ff 100%);
+  border: 1px solid #6b8fd3;
+  color: #1a2340;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: 700;
+  box-shadow: 0 4px 10px rgba(12, 26, 58, 0.25);
+}
+
+.api-keys-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.api-keys-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(120px, 1fr) minmax(160px, 1.2fr) auto;
+}
+
+.start-menu-action:hover {
+  filter: brightness(1.03);
+}
+
+@container (max-width: 720px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@container (max-width: 640px) {
+  .window-content {
+    padding: 18px;
+  }
+
+  .panel {
+    padding: 14px;
+  }
+
+  .notice {
+    word-break: break-word;
+  }
+
+  .table-scroll .xp-table {
+    min-width: 680px;
+  }
+}
+
+@container (max-width: 520px) {
+  .window-content {
+    padding: 14px;
+  }
+
+  .panel {
+    padding: 12px;
+  }
+
+  .button-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .xp-button {
+    width: 100%;
+  }
 }
 
 .calculator {
@@ -760,6 +1090,40 @@ textarea {
 }
 
 @media (max-width: 840px) {
+  .login-screen {
+    padding: 20px;
+  }
+
+  .login-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .login-hero {
+    order: -1;
+    padding: 28px;
+  }
+
+  .login-form {
+    padding: 28px;
+  }
+
+  .start-menu {
+    width: min(92vw, 340px);
+  }
+
+  .start-menu-body {
+    flex-direction: column;
+  }
+
+  .start-menu-left,
+  .start-menu-right {
+    flex: 1;
+  }
+
+  .api-keys-row {
+    grid-template-columns: 1fr;
+  }
+
   .desktop-icons {
     position: static;
     grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));

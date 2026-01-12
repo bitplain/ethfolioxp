@@ -2,10 +2,15 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import DesktopShell from "@/components/desktop/DesktopShell";
 import EtherscanForm from "@/components/EtherscanForm";
+import ApiKeysForm from "@/components/ApiKeysForm";
 import SyncButton from "@/components/SyncButton";
+import BackfillButton from "@/components/BackfillButton";
+import TransferPriceOverride from "@/components/TransferPriceOverride";
 import WalletForm from "@/components/WalletForm";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { buildHoldings } from "@/lib/holdings";
+import { getUserSettings } from "@/lib/settings";
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
@@ -13,51 +18,45 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const [wallet, settings, transfers] = await Promise.all([
+  const [wallet, settings, transfers, groupedTotals] = await Promise.all([
     prisma.wallet.findFirst({ where: { userId: session.user.id } }),
-    prisma.userSettings.findUnique({ where: { userId: session.user.id } }),
+    getUserSettings(session.user.id),
     prisma.transfer.findMany({
       where: { userId: session.user.id },
       include: { token: true },
       orderBy: { blockTime: "desc" },
       take: 50,
     }),
+    prisma.transfer.groupBy({
+      by: ["tokenId", "direction"],
+      where: { userId: session.user.id },
+      _sum: { amount: true },
+    }),
   ]);
 
-  const totals = new Map<
-    string,
-    {
-      token: (typeof transfers)[number]["token"];
-      amount: (typeof transfers)[number]["amount"];
-    }
-  >();
-
-  for (const transfer of transfers) {
-    const existing = totals.get(transfer.tokenId) ?? {
-      token: transfer.token,
-      amount: transfer.amount.mul(0),
-    };
-    const delta =
-      transfer.direction === "IN"
-        ? transfer.amount
-        : transfer.amount.mul(-1);
-    existing.amount = existing.amount.add(delta);
-    totals.set(transfer.tokenId, existing);
-  }
-
-  const holdings = Array.from(totals.values()).filter((item) =>
-    item.amount.abs().greaterThan(0)
+  const tokenIds = Array.from(
+    new Set(groupedTotals.map((group) => group.tokenId))
   );
+  const tokens = tokenIds.length
+    ? await prisma.token.findMany({ where: { id: { in: tokenIds } } })
+    : [];
+  const holdings = buildHoldings(groupedTotals, tokens);
 
   const lastSync = transfers[0]?.blockTime;
+  const extraApiKeys = settings?.apiKeys ?? [];
+  const moralisApiKey = settings?.moralisApiKey ?? "";
+  const formatMoney = (value: { toString(): string } | null) =>
+    value ? Number(value.toString()).toFixed(2) : "-";
 
   return (
     <DesktopShell
       mainId="ethfolio"
       mainTitle="Ethfolio"
       mainSubtitle="Портфель и транзакции"
+      mainIcon="/icons/xp/eth.svg"
       mainDefaultOpen={false}
       mainCanClose
+      userEmail={session.user.email ?? null}
       extraWindows={[
         {
           id: "sync",
@@ -73,16 +72,17 @@ export default async function DashboardPage() {
                   </span>
                 ) : null}
               </div>
-              <div className="panel">
-                <div className="panel-title">Синхронизация</div>
-                <p className="muted">
-                  Обнови историю транзакций и цен в один клик.
-                </p>
-                <SyncButton />
+                <div className="panel">
+                  <div className="panel-title">Синхронизация</div>
+                  <p className="muted">
+                    Обнови историю транзакций и цен в один клик.
+                  </p>
+                  <SyncButton />
+                  <BackfillButton />
+                </div>
               </div>
-            </div>
-          ),
-        },
+            ),
+          },
         {
           id: "settings",
           title: "Settings",
@@ -102,6 +102,10 @@ export default async function DashboardPage() {
                 </p>
                 <EtherscanForm hasKey={Boolean(settings?.etherscanApiKey)} />
               </div>
+              <ApiKeysForm
+                initialMoralisKey={moralisApiKey}
+                initialKeys={extraApiKeys}
+              />
               <div className="panel">
                 <div className="panel-title">Темы и звуки</div>
                 <p className="muted">
@@ -129,6 +133,7 @@ export default async function DashboardPage() {
             Нажми кнопку, чтобы обновить историю транзакций и цены.
           </p>
           <SyncButton />
+          <BackfillButton />
         </div>
 
         <div className="grid">
@@ -155,34 +160,48 @@ export default async function DashboardPage() {
         <div className="panel">
           <div className="panel-title">Последние транзакции</div>
           {transfers.length ? (
-            <table className="xp-table">
-              <thead>
-                <tr>
-                  <th>Время</th>
-                  <th>Токен</th>
-                  <th>Направление</th>
-                  <th>Количество</th>
-                  <th>Цена (USD)</th>
-                  <th>Сумма (USD)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transfers.map((tx: (typeof transfers)[number]) => (
-                  <tr key={`${tx.txHash}-${tx.logIndex}`}>
-                    <td>{tx.blockTime.toLocaleString("ru-RU")}</td>
-                    <td>{tx.token.symbol}</td>
-                    <td>{tx.direction === "IN" ? "Вход" : "Выход"}</td>
-                    <td>{Number(tx.amount.toString()).toFixed(4)}</td>
-                    <td>
-                      {tx.priceUsd ? Number(tx.priceUsd.toString()).toFixed(2) : "-"}
-                    </td>
-                    <td>
-                      {tx.valueUsd ? Number(tx.valueUsd.toString()).toFixed(2) : "-"}
-                    </td>
+            <div className="table-scroll">
+              <table className="xp-table">
+                <thead>
+                  <tr>
+                    <th>Время</th>
+                    <th>Токен</th>
+                    <th>Направление</th>
+                    <th>Количество</th>
+                    <th>Цена (USD)</th>
+                    <th>Сумма (USD)</th>
+                    <th>Цена (RUB)</th>
+                    <th>Сумма (RUB)</th>
+                    <th>Корректировка</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {transfers.map((tx: (typeof transfers)[number]) => {
+                    const showRub = tx.direction === "IN";
+                    return (
+                      <tr key={`${tx.txHash}-${tx.logIndex}`}>
+                        <td>{tx.blockTime.toLocaleString("ru-RU")}</td>
+                        <td>{tx.token.symbol}</td>
+                        <td>{tx.direction === "IN" ? "Вход" : "Выход"}</td>
+                        <td>{Number(tx.amount.toString()).toFixed(4)}</td>
+                        <td>{formatMoney(tx.priceUsd)}</td>
+                        <td>{formatMoney(tx.valueUsd)}</td>
+                        <td>{showRub ? formatMoney(tx.priceRub) : "-"}</td>
+                        <td>{showRub ? formatMoney(tx.valueRub) : "-"}</td>
+                        <td>
+                          <TransferPriceOverride
+                            transferId={tx.id}
+                            priceUsd={tx.priceUsd?.toString() ?? null}
+                            priceRub={tx.priceRub?.toString() ?? null}
+                            priceManual={tx.priceManual}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           ) : (
             <p className="muted">Транзакций пока нет.</p>
           )}

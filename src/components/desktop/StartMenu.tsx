@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
+import { handleLogoutFlow } from "@/lib/authFlow";
 import { useSettings } from "./SettingsProvider";
 
 export type StartMenuItem = {
@@ -21,6 +23,7 @@ export default function StartMenu({
   onTile,
   onClose,
   onOpenWindow,
+  userEmail,
 }: {
   open: boolean;
   leftItems: StartMenuItem[];
@@ -30,6 +33,7 @@ export default function StartMenu({
   onTile: () => void;
   onClose: () => void;
   onOpenWindow: (id: string) => void;
+  userEmail?: string | null;
 }) {
   const router = useRouter();
   const { playSound } = useSettings();
@@ -55,9 +59,28 @@ export default function StartMenu({
     onClose();
   };
 
+  const handleLogout = async () => {
+    onClose();
+    await handleLogoutFlow({
+      playSound,
+      signOut,
+      navigate: (path) => router.replace(path),
+    });
+  };
+
   return (
     <div className="start-menu" onClick={(event) => event.stopPropagation()}>
-      <div className="start-menu-header">Ethfolio XP</div>
+      <div className="start-menu-header">
+        <div className="start-menu-profile">
+          <div className="start-menu-avatar" aria-hidden />
+          <div>
+            <div className="start-menu-username">
+              {userEmail || "Гость"}
+            </div>
+            <div className="start-menu-brand">RetroDesk</div>
+          </div>
+        </div>
+      </div>
       <div className="start-menu-body">
         <div className="start-menu-left">
           {leftItems.map((item) => (
@@ -181,7 +204,11 @@ export default function StartMenu({
           ))}
         </div>
       ) : null}
-      <div className="start-menu-footer">Use taskbar to manage sessions</div>
+      <div className="start-menu-footer">
+        <button className="start-menu-action" type="button" onClick={handleLogout}>
+          Выход из системы
+        </button>
+      </div>
     </div>
   );
 }

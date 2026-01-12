@@ -3,8 +3,8 @@ import SettingsProvider from "@/components/desktop/SettingsProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Ethfolio",
-  description: "Personal ETH portfolio tracker",
+  title: "RetroDesk",
+  description: "XP-style workspace with modular crypto apps",
 };
 
 export default function RootLayout({

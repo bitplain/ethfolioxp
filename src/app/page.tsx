@@ -4,14 +4,14 @@ export default function HomePage() {
   return (
     <DesktopShell
       mainId="welcome"
-      mainTitle="Ethfolio"
-      mainSubtitle="Личный портфель в стиле Windows XP"
+      mainTitle="RetroDesk"
+      mainSubtitle="XP-workspace для крипто-приложений"
     >
       <div className="stack">
         <h1 className="window-heading">Добро пожаловать.</h1>
         <p className="muted">
-          Подключи кошелек, синхронизируй транзакции и смотри баланс с
-          историческими ценами прямо на своем десктопе.
+          Запусти Ethfolio или другие приложения, чтобы подключить кошелек,
+          синхронизировать транзакции и смотреть баланс с историческими ценами.
         </p>
         <div className="button-row">
           <a className="xp-button" href="/register">
