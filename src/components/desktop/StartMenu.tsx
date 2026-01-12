@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { handleLogoutFlow } from "@/lib/authFlow";
 import { useSettings } from "./SettingsProvider";
 
 export type StartMenuItem = {
@@ -59,9 +60,12 @@ export default function StartMenu({
   };
 
   const handleLogout = async () => {
-    playSound("click");
     onClose();
-    await signOut({ callbackUrl: "/login" });
+    await handleLogoutFlow({
+      playSound,
+      signOut,
+      navigate: (path) => router.replace(path),
+    });
   };
 
   return (

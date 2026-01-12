@@ -19,6 +19,7 @@ import {
   saveWindowLayout,
   tileLayout,
 } from "@/lib/windowLayouts";
+import { debounce } from "@/lib/debounce";
 
 type WindowConfig = {
   id: string;
@@ -106,6 +107,7 @@ export default function DesktopShell({
     y: number;
   }>({ open: false, x: 0, y: 0 });
   const zCounter = useRef(100);
+  const saveLayout = useMemo(() => debounce(saveWindowLayout, 250), []);
 
   const windowConfigs = useMemo<WindowConfig[]>(() => {
     const baseConfigs: WindowConfig[] = [
@@ -345,17 +347,18 @@ export default function DesktopShell({
   };
 
   const toggleMinimize = (id: string) => {
-    playSound("click");
     setWindows((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              isMinimized: !item.isMinimized,
-              zIndex: item.isMinimized ? ++zCounter.current : item.zIndex,
-            }
-          : item
-      )
+      prev.map((item) => {
+        if (item.id !== id) {
+          return item;
+        }
+        playSound(item.isMinimized ? "restore" : "minimize");
+        return {
+          ...item,
+          isMinimized: !item.isMinimized,
+          zIndex: item.isMinimized ? ++zCounter.current : item.zIndex,
+        };
+      })
     );
   };
 
@@ -382,7 +385,7 @@ export default function DesktopShell({
   };
 
   const toggleMaximize = (id: string) => {
-    playSound("click");
+    playSound("restore");
     setWindows((prev) =>
       prev.map((item) => {
         if (item.id !== id) {
@@ -427,8 +430,9 @@ export default function DesktopShell({
       isMinimized: item.isMinimized,
       isMaximized: item.isMaximized,
     }));
-    saveWindowLayout(payload);
-  }, [windows]);
+    saveLayout(payload);
+    return () => saveLayout.cancel();
+  }, [saveLayout, windows]);
 
   const cascadeWindows = () => {
     const openIds = windows.filter((item) => item.isOpen).map((item) => item.id);

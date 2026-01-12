@@ -6,6 +6,7 @@ import ApiKeysForm from "@/components/ApiKeysForm";
 import WalletForm from "@/components/WalletForm";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { getUserSettings } from "@/lib/settings";
 
 export default async function SettingsPage() {
   const session = await getServerSession(authOptions);
@@ -15,11 +16,9 @@ export default async function SettingsPage() {
 
   const [wallet, settings] = await Promise.all([
     prisma.wallet.findFirst({ where: { userId: session.user.id } }),
-    prisma.userSettings.findUnique({ where: { userId: session.user.id } }),
+    getUserSettings(session.user.id),
   ]);
-  const extraApiKeys = Array.isArray(settings?.apiKeys)
-    ? (settings?.apiKeys as { name: string; value: string }[])
-    : [];
+  const extraApiKeys = settings?.apiKeys ?? [];
   const moralisApiKey = settings?.moralisApiKey ?? "";
 
   return (

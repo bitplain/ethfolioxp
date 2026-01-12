@@ -19,7 +19,9 @@ type SettingsState = {
 type SettingsContextValue = SettingsState & {
   toggleTheme: () => void;
   toggleSound: () => void;
-  playSound: (name: "click" | "startup" | "notify") => void;
+  playSound: (
+    name: "click" | "notify" | "startup" | "shutdown" | "start" | "minimize" | "restore"
+  ) => Promise<void>;
 };
 
 const STORAGE_KEY = "ethfolio.settings";
@@ -55,7 +57,6 @@ export default function SettingsProvider({ children }: { children: React.ReactNo
   const [settings, setSettings] = useState<SettingsState>(defaultSettings);
   const [hydrated, setHydrated] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
-  const [startupPlayed, setStartupPlayed] = useState(false);
 
   useEffect(() => {
     setSettings(loadSettings());
@@ -93,24 +94,45 @@ export default function SettingsProvider({ children }: { children: React.ReactNo
   }, [audioReady]);
 
   const playSound = useCallback(
-    (name: "click" | "startup" | "notify") => {
+    async (
+      name: "click" | "notify" | "startup" | "shutdown" | "start" | "minimize" | "restore"
+    ) => {
       if (!settings.soundEnabled || !audioReady) {
         return;
       }
-      const audio = new Audio(`/sounds/xp-${name}.wav`);
-      audio.volume = 0.6;
-      audio.play().catch(() => playFallbackBeep());
+      const sources: Record<string, string | null> = {
+        click: null,
+        notify: null,
+        startup: "/sounds/win-xp/windows-xp-startup.mp3",
+        shutdown: "/sounds/win-xp/windows-xp-shutdown.mp3",
+        start: "/sounds/win-xp/windows-navigation-start.mp3",
+        minimize: "/sounds/win-xp/windows-xp-minimize.mp3",
+        restore: "/sounds/win-xp/windows-xp-restore.mp3",
+      };
+      const source = sources[name];
+      if (!source) {
+        if (name === "click" || name === "notify") {
+          return;
+        }
+        playFallbackBeep();
+        return;
+      }
+
+      await new Promise<void>((resolve) => {
+        const audio = new Audio(source);
+        audio.volume = 0.6;
+        audio.onended = () => resolve();
+        audio.onerror = () => resolve();
+        audio.onabort = () => resolve();
+        audio.play().catch(() => {
+          playFallbackBeep();
+          resolve();
+        });
+      });
     },
     [audioReady, playFallbackBeep, settings.soundEnabled]
   );
 
-  useEffect(() => {
-    if (!audioReady || startupPlayed || !settings.soundEnabled) {
-      return;
-    }
-    playSound("startup");
-    setStartupPlayed(true);
-  }, [audioReady, playSound, settings.soundEnabled, startupPlayed]);
 
   const value = useMemo<SettingsContextValue>(
     () => ({

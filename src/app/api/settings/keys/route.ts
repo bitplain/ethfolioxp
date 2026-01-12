@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
+import { encryptSecret } from "@/lib/crypto";
 import { prisma } from "@/lib/db";
 
 type ApiKeyEntry = { name: string; value: string };
@@ -40,16 +41,31 @@ export async function POST(request: Request) {
       );
     }
 
+    let encryptedMoralis: string | null = null;
+    let encryptedKeys: ApiKeyEntry[] = [];
+    try {
+      encryptedMoralis = moralisApiKey ? encryptSecret(moralisApiKey) : null;
+      encryptedKeys = apiKeys.map((entry) => ({
+        name: entry.name,
+        value: encryptSecret(entry.value),
+      }));
+    } catch {
+      return NextResponse.json(
+        { error: "Missing encryption secret for API keys." },
+        { status: 500 }
+      );
+    }
+
     await prisma.userSettings.upsert({
       where: { userId: session.user.id },
       create: {
         userId: session.user.id,
-        moralisApiKey: moralisApiKey || null,
-        apiKeys: apiKeys.length ? apiKeys : Prisma.JsonNull,
+        moralisApiKey: encryptedMoralis,
+        apiKeys: encryptedKeys.length ? encryptedKeys : Prisma.JsonNull,
       },
       update: {
-        moralisApiKey: moralisApiKey || null,
-        apiKeys: apiKeys.length ? apiKeys : Prisma.JsonNull,
+        moralisApiKey: encryptedMoralis,
+        apiKeys: encryptedKeys.length ? encryptedKeys : Prisma.JsonNull,
       },
     });
 

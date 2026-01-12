@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { useSettings } from "@/components/desktop/SettingsProvider";
+import { handleLoginSuccessFlow } from "@/lib/authFlow";
 
 export default function LoginPage() {
+  const router = useRouter();
   const { playSound } = useSettings();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,19 +21,27 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
 
-    if (result?.error) {
-      setError("Неверный email или пароль.");
+      if (result?.error) {
+        setError("Неверный email или пароль.");
+        return;
+      }
+
+      handleLoginSuccessFlow({
+        playSound,
+        navigate: (path) => router.push(path),
+      });
+    } catch {
+      setError("Ошибка сети. Проверь соединение.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    window.location.href = "/dashboard";
   };
 
   return (

@@ -1,6 +1,8 @@
 import { Prisma, TokenKind, TransferDirection } from "@prisma/client";
+import { buildBackfillWhere } from "./backfill";
 import { prisma } from "./db";
 import { fetchUsdRubRate } from "./fx";
+import { getUserSettings } from "./settings";
 
 const ETH_SYMBOL = "ETH";
 const ETH_NAME = "Ethereum";
@@ -11,8 +13,23 @@ const COINGECKO_API_BASE =
 const ETHERSCAN_API_BASE =
   process.env.ETHERSCAN_API_BASE || "https://api.etherscan.io/v2/api";
 const ETHERSCAN_CHAIN_ID = process.env.ETHERSCAN_CHAIN_ID || "1";
+const ETHERSCAN_PAGE_SIZE = Math.max(
+  1,
+  Number(process.env.ETHERSCAN_PAGE_SIZE || 100)
+);
+const ETHERSCAN_MAX_PAGES = Math.max(
+  1,
+  Number(process.env.ETHERSCAN_MAX_PAGES || 20)
+);
 const MORALIS_API_BASE = "https://deep-index.moralis.io/api/v2.2";
 const DEFAULT_MORALIS_API_KEY = process.env.MORALIS_API_KEY;
+const LIVE_FALLBACK_MAX_AGE_SEC = Number(
+  process.env.LIVE_FALLBACK_MAX_AGE_SEC || 60 * 60
+);
+const BACKFILL_BATCH_SIZE = Number(process.env.BACKFILL_BATCH_SIZE || 150);
+const BACKFILL_MAX_BATCHES = Number(process.env.BACKFILL_MAX_BATCHES || 5);
+const BACKFILL_CONCURRENCY = Number(process.env.BACKFILL_CONCURRENCY || 4);
+const BACKFILL_THROTTLE_MS = Number(process.env.BACKFILL_THROTTLE_MS || 200);
 
 type EtherscanResponse<T> = {
   status: string;
@@ -53,6 +70,10 @@ function toDecimalAmount(raw: string, decimals: number) {
   return value.div(divider);
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
@@ -81,6 +102,34 @@ async function fetchEtherscan<T>(params: URLSearchParams, apiKey: string): Promi
   }
 
   return Array.isArray(data.result) ? (data.result as T[]) : [];
+}
+
+export async function fetchEtherscanPaginated<T>(
+  params: URLSearchParams,
+  apiKey: string,
+  options?: {
+    pageSize?: number;
+    maxPages?: number;
+    fetchPage?: (params: URLSearchParams, apiKey: string) => Promise<T[]>;
+  }
+): Promise<T[]> {
+  const pageSize = options?.pageSize ?? ETHERSCAN_PAGE_SIZE;
+  const maxPages = options?.maxPages ?? ETHERSCAN_MAX_PAGES;
+  const fetchPage = options?.fetchPage ?? fetchEtherscan;
+  const results: T[] = [];
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const pageParams = new URLSearchParams(params);
+    pageParams.set("page", String(page));
+    pageParams.set("offset", String(pageSize));
+    const chunk = await fetchPage(pageParams, apiKey);
+    results.push(...chunk);
+    if (chunk.length < pageSize) {
+      break;
+    }
+  }
+
+  return results;
 }
 
 async function getOrCreateEthToken(userId: string) {
@@ -243,7 +292,7 @@ async function fetchDexscreenerPriceUsd(contractAddress: string) {
 async function getPrices(
   token: { id: string; kind: TokenKind; contractAddress: string },
   timestampSec: number,
-  options?: { moralisApiKey?: string | null }
+  options?: { moralisApiKey?: string | null; allowLiveFallback?: boolean }
 ) {
   const bucketTs = Math.floor(timestampSec / PRICE_BUCKET_SECONDS) * PRICE_BUCKET_SECONDS;
   const cached = await prisma.priceSnapshot.findUnique({
@@ -280,6 +329,7 @@ async function getPrices(
     fetchTokenPrice(token, bucketTs, "rub"),
   ]);
 
+  const allowLiveFallback = options?.allowLiveFallback ?? false;
   if (priceUsdRaw === null && token.kind === TokenKind.ERC20) {
     priceUsdRaw =
       (await fetchMoralisPriceUsd(
@@ -287,7 +337,9 @@ async function getPrices(
         timestampSec,
         options?.moralisApiKey
       )) ??
-      (await fetchDexscreenerPriceUsd(token.contractAddress));
+      (allowLiveFallback
+        ? await fetchDexscreenerPriceUsd(token.contractAddress)
+        : null);
   }
 
   let priceUsd =
@@ -316,9 +368,18 @@ async function getPrices(
     return { priceUsd: null, priceRub: null, bucketTs };
   }
 
-  await prisma.priceSnapshot.create({
-    data: { tokenId: token.id, bucketTs, priceUsd, priceRub },
-  });
+  try {
+    await prisma.priceSnapshot.create({
+      data: { tokenId: token.id, bucketTs, priceUsd, priceRub },
+    });
+  } catch {
+    const existing = await prisma.priceSnapshot.findUnique({
+      where: { tokenId_bucketTs: { tokenId: token.id, bucketTs } },
+    });
+    if (existing) {
+      return { priceUsd: existing.priceUsd, priceRub: existing.priceRub, bucketTs };
+    }
+  }
 
   return { priceUsd, priceRub, bucketTs };
 }
@@ -332,9 +393,7 @@ export async function syncWallet(userId: string) {
     throw new Error("Wallet is not set.");
   }
 
-  const settings = await prisma.userSettings.findUnique({
-    where: { userId },
-  });
+  const settings = await getUserSettings(userId);
   const apiKey = settings?.etherscanApiKey;
   const moralisApiKey = settings?.moralisApiKey ?? DEFAULT_MORALIS_API_KEY;
   if (!apiKey) {
@@ -343,9 +402,10 @@ export async function syncWallet(userId: string) {
 
   const address = normalizeAddress(wallet.address);
   const ethToken = await getOrCreateEthToken(userId);
+  const nowSec = Math.floor(Date.now() / 1000);
 
   const [ethTxs, tokenTxs] = await Promise.all([
-    fetchEtherscan<EtherscanTx>(
+    fetchEtherscanPaginated<EtherscanTx>(
       new URLSearchParams({
         module: "account",
         action: "txlist",
@@ -354,7 +414,7 @@ export async function syncWallet(userId: string) {
       }),
       apiKey
     ),
-    fetchEtherscan<EtherscanTokenTx>(
+    fetchEtherscanPaginated<EtherscanTokenTx>(
       new URLSearchParams({
         module: "account",
         action: "tokentx",
@@ -386,8 +446,12 @@ export async function syncWallet(userId: string) {
     const direction = from === address ? TransferDirection.OUT : TransferDirection.IN;
     const amount = toDecimalAmount(tx.value, 18);
     const timestampSec = Number(tx.timeStamp);
+    const ageSec = nowSec - timestampSec;
+    const allowLiveFallback =
+      ageSec >= 0 && ageSec <= LIVE_FALLBACK_MAX_AGE_SEC;
     const { priceUsd, priceRub } = await getPrices(ethToken, timestampSec, {
       moralisApiKey,
+      allowLiveFallback,
     });
     const valueUsd = priceUsd ? priceUsd.mul(amount) : null;
     const valueRub = priceRub ? priceRub.mul(amount) : null;
@@ -435,6 +499,9 @@ export async function syncWallet(userId: string) {
     const decimals = Number(tx.tokenDecimal || 0);
     const amount = toDecimalAmount(tx.value, decimals);
     const timestampSec = Number(tx.timeStamp);
+    const ageSec = nowSec - timestampSec;
+    const allowLiveFallback =
+      ageSec >= 0 && ageSec <= LIVE_FALLBACK_MAX_AGE_SEC;
 
     const token = await getOrCreateToken(userId, {
       contractAddress: tx.contractAddress,
@@ -445,6 +512,7 @@ export async function syncWallet(userId: string) {
 
     const { priceUsd, priceRub } = await getPrices(token, timestampSec, {
       moralisApiKey,
+      allowLiveFallback,
     });
     const valueUsd = priceUsd ? priceUsd.mul(amount) : null;
     const valueRub = priceRub ? priceRub.mul(amount) : null;
@@ -488,52 +556,76 @@ export async function backfillMissingPrices(userId: string) {
   let scanned = 0;
   let updated = 0;
   let batches = 0;
-  const settings = await prisma.userSettings.findUnique({
-    where: { userId },
-  });
+  const settings = await getUserSettings(userId);
   const moralisApiKey = settings?.moralisApiKey ?? DEFAULT_MORALIS_API_KEY;
+  let cursorId: string | null = null;
+  type TransferWithToken = Prisma.TransferGetPayload<{ include: { token: true } }>;
 
-  while (batches < 5) {
-    const transfers = await prisma.transfer.findMany({
-      where: {
-        userId,
-        priceManual: false,
-        OR: [{ priceUsd: null }, { priceRub: null }],
-      },
+  const priceCache = new Map<
+    string,
+    { priceUsd: Prisma.Decimal | null; priceRub: Prisma.Decimal | null }
+  >();
+  const concurrency = Math.max(1, BACKFILL_CONCURRENCY);
+
+  while (batches < BACKFILL_MAX_BATCHES) {
+    const transfers: TransferWithToken[] = await prisma.transfer.findMany({
+      where: buildBackfillWhere(userId, cursorId),
       include: { token: true },
-      orderBy: { blockTime: "asc" },
-      take: 150,
+      orderBy: { id: "asc" },
+      take: BACKFILL_BATCH_SIZE,
     });
 
     if (!transfers.length) {
       break;
     }
 
+    cursorId = transfers[transfers.length - 1].id;
     scanned += transfers.length;
     let batchUpdated = 0;
 
-    for (const transfer of transfers) {
-      const timestampSec = Math.floor(transfer.blockTime.getTime() / 1000);
-      const { priceUsd, priceRub } = await getPrices(transfer.token, timestampSec, {
-        moralisApiKey,
-      });
-      if (!priceUsd && !priceRub) {
-        continue;
+    for (let index = 0; index < transfers.length; index += concurrency) {
+      const slice = transfers.slice(index, index + concurrency);
+      const results = await Promise.all(
+        slice.map(async (transfer) => {
+          const timestampSec = Math.floor(transfer.blockTime.getTime() / 1000);
+          const bucketTs =
+            Math.floor(timestampSec / PRICE_BUCKET_SECONDS) * PRICE_BUCKET_SECONDS;
+          const cacheKey = `${transfer.tokenId}:${bucketTs}`;
+          const cached = priceCache.get(cacheKey);
+          const { priceUsd, priceRub } =
+            cached ??
+            (await getPrices(transfer.token, timestampSec, {
+              moralisApiKey,
+              allowLiveFallback: false,
+            }));
+
+          if (!cached) {
+            priceCache.set(cacheKey, { priceUsd, priceRub });
+          }
+
+          if (!priceUsd && !priceRub) {
+            return false;
+          }
+
+          const valueUsd = priceUsd ? priceUsd.mul(transfer.amount) : null;
+          const valueRub = priceRub ? priceRub.mul(transfer.amount) : null;
+
+          await prisma.transfer.update({
+            where: { id: transfer.id },
+            data: { priceUsd, valueUsd, priceRub, valueRub },
+          });
+
+          return true;
+        })
+      );
+
+      const updatedNow = results.filter(Boolean).length;
+      updated += updatedNow;
+      batchUpdated += updatedNow;
+
+      if (BACKFILL_THROTTLE_MS > 0 && index + concurrency < transfers.length) {
+        await sleep(BACKFILL_THROTTLE_MS);
       }
-
-      const valueUsd = priceUsd ? priceUsd.mul(transfer.amount) : null;
-      const valueRub = priceRub ? priceRub.mul(transfer.amount) : null;
-
-      await prisma.transfer.update({
-        where: { id: transfer.id },
-        data: { priceUsd, valueUsd, priceRub, valueRub },
-      });
-      updated += 1;
-      batchUpdated += 1;
-    }
-
-    if (batchUpdated === 0) {
-      break;
     }
 
     batches += 1;

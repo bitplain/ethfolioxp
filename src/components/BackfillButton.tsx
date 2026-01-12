@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSettings } from "@/components/desktop/SettingsProvider";
+import { postJson } from "@/lib/http";
 
 export default function BackfillButton() {
   const { playSound } = useSettings();
@@ -12,18 +13,31 @@ export default function BackfillButton() {
     playSound("click");
     setLoading(true);
     setMessage(null);
-    const response = await fetch("/api/prices/backfill", { method: "POST" });
-    const data = await response.json().catch(() => ({}));
+    try {
+      const result = await postJson("/api/prices/backfill");
 
-    if (!response.ok) {
-      setMessage(data.error || "Ошибка обновления цен.");
+      if (!result.ok) {
+        const errorMessage =
+          result.data.error ||
+          (result.error
+            ? "Ошибка сети. Проверь соединение."
+            : "Ошибка обновления цен.");
+        setMessage(errorMessage);
+        return;
+      }
+
+      playSound("notify");
+      if (
+        typeof result.data.updated === "number" &&
+        typeof result.data.scanned === "number"
+      ) {
+        setMessage(`Обновлено ${result.data.updated} из ${result.data.scanned}.`);
+      } else {
+        setMessage("Обновление цен завершено.");
+      }
+    } finally {
       setLoading(false);
-      return;
     }
-
-    playSound("notify");
-    setMessage("Обновление цен запущено в фоне.");
-    setLoading(false);
   };
 
   return (

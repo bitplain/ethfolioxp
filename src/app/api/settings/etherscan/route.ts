@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
+import { encryptSecret } from "@/lib/crypto";
 import { prisma } from "@/lib/db";
 
 export async function POST(request: Request) {
@@ -31,10 +32,20 @@ export async function POST(request: Request) {
       );
     }
 
+    let encryptedKey: string;
+    try {
+      encryptedKey = encryptSecret(apiKey);
+    } catch {
+      return NextResponse.json(
+        { error: "Missing encryption secret for API keys." },
+        { status: 500 }
+      );
+    }
+
     await prisma.userSettings.upsert({
       where: { userId: session.user.id },
-      create: { userId: session.user.id, etherscanApiKey: apiKey },
-      update: { etherscanApiKey: apiKey },
+      create: { userId: session.user.id, etherscanApiKey: encryptedKey },
+      update: { etherscanApiKey: encryptedKey },
     });
 
     return NextResponse.json({ ok: true });

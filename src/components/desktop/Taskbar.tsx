@@ -55,7 +55,7 @@ export default function Taskbar({
         className={`start-button ${startOpen ? "active" : ""}`}
         type="button"
         onClick={() => {
-          playSound("click");
+          playSound("start");
           onToggleStart();
         }}
       >

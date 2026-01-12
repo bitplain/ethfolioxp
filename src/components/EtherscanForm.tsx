@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSettings } from "@/components/desktop/SettingsProvider";
+import { postJson } from "@/lib/http";
 
 export default function EtherscanForm({ hasKey }: { hasKey: boolean }) {
   const { playSound } = useSettings();
@@ -16,22 +17,23 @@ export default function EtherscanForm({ hasKey }: { hasKey: boolean }) {
     setLoading(true);
     setMessage(null);
 
-    const response = await fetch("/api/settings/etherscan", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ apiKey }),
-    });
+    try {
+      const result = await postJson("/api/settings/etherscan", { apiKey });
 
-    const data = await response.json().catch(() => ({}));
+      if (!result.ok) {
+        const errorMessage =
+          result.data.error ||
+          (result.error
+            ? "Ошибка сети. Проверь соединение."
+            : "Ошибка сохранения ключа.");
+        setMessage(errorMessage);
+        return;
+      }
 
-    if (!response.ok) {
-      setMessage(data.error || "Ошибка сохранения ключа.");
+      setMessage("Ключ сохранен.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setMessage("Ключ сохранен.");
-    setLoading(false);
   };
 
   return (

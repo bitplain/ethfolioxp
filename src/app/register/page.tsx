@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useSettings } from "@/components/desktop/SettingsProvider";
+import { postJson } from "@/lib/http";
 
 export default function RegisterPage() {
   const { playSound } = useSettings();
@@ -19,21 +20,21 @@ export default function RegisterPage() {
     setError(null);
     setMessage(null);
 
-    const response = await fetch("/api/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
+    try {
+      const result = await postJson("/api/register", { email, password });
 
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      setError(data.error || "Ошибка регистрации.");
+      if (!result.ok) {
+        const errorMessage =
+          result.data.error ||
+          (result.error ? "Ошибка сети. Проверь соединение." : "Ошибка регистрации.");
+        setError(errorMessage);
+        return;
+      }
+
+      setMessage("Аккаунт создан. Теперь войдите.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setMessage("Аккаунт создан. Теперь войдите.");
-    setLoading(false);
   };
 
   return (

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSettings } from "@/components/desktop/SettingsProvider";
+import { postJson } from "@/lib/http";
 
 type ApiKeyEntry = { name: string; value: string };
 
@@ -43,24 +44,26 @@ export default function ApiKeysForm({
     setMessage(null);
 
     setLoading(true);
-    const response = await fetch("/api/settings/keys", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    try {
+      const result = await postJson("/api/settings/keys", {
         moralisApiKey,
         apiKeys: keys,
-      }),
-    });
+      });
 
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setError(data.error || "Ошибка сохранения ключей.");
+      if (!result.ok) {
+        const errorMessage =
+          result.data.error ||
+          (result.error
+            ? "Ошибка сети. Проверь соединение."
+            : "Ошибка сохранения ключей.");
+        setError(errorMessage);
+        return;
+      }
+
+      setMessage("Ключи сохранены.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setMessage("Ключи сохранены.");
-    setLoading(false);
   };
 
   return (

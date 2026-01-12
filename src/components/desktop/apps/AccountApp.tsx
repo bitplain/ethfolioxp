@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSettings } from "@/components/desktop/SettingsProvider";
+import { postJson } from "@/lib/http";
 
 export default function AccountApp({ email }: { email?: string | null }) {
   const { playSound } = useSettings();
@@ -30,28 +31,29 @@ export default function AccountApp({ email }: { email?: string | null }) {
 
     setLoading(true);
 
-    const response = await fetch("/api/account/password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    try {
+      const result = await postJson("/api/account/password", {
         currentPassword,
         newPassword: nextPassword,
-      }),
-    });
+      });
 
-    const data = await response.json().catch(() => ({}));
+      if (!result.ok) {
+        const errorMessage =
+          result.data.error ||
+          (result.error
+            ? "Ошибка сети. Проверь соединение."
+            : "Ошибка смены пароля.");
+        setError(errorMessage);
+        return;
+      }
 
-    if (!response.ok) {
-      setError(data.error || "Ошибка смены пароля.");
+      setMessage("Пароль обновлен.");
+      setCurrentPassword("");
+      setNextPassword("");
+      setConfirmPassword("");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setMessage("Пароль обновлен.");
-    setCurrentPassword("");
-    setNextPassword("");
-    setConfirmPassword("");
-    setLoading(false);
   };
 
   return (

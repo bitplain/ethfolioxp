@@ -9,6 +9,8 @@ import TransferPriceOverride from "@/components/TransferPriceOverride";
 import WalletForm from "@/components/WalletForm";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { buildHoldings } from "@/lib/holdings";
+import { getUserSettings } from "@/lib/settings";
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
@@ -16,46 +18,32 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const [wallet, settings, transfers] = await Promise.all([
+  const [wallet, settings, transfers, groupedTotals] = await Promise.all([
     prisma.wallet.findFirst({ where: { userId: session.user.id } }),
-    prisma.userSettings.findUnique({ where: { userId: session.user.id } }),
+    getUserSettings(session.user.id),
     prisma.transfer.findMany({
       where: { userId: session.user.id },
       include: { token: true },
       orderBy: { blockTime: "desc" },
       take: 50,
     }),
+    prisma.transfer.groupBy({
+      by: ["tokenId", "direction"],
+      where: { userId: session.user.id },
+      _sum: { amount: true },
+    }),
   ]);
 
-  const totals = new Map<
-    string,
-    {
-      token: (typeof transfers)[number]["token"];
-      amount: (typeof transfers)[number]["amount"];
-    }
-  >();
-
-  for (const transfer of transfers) {
-    const existing = totals.get(transfer.tokenId) ?? {
-      token: transfer.token,
-      amount: transfer.amount.mul(0),
-    };
-    const delta =
-      transfer.direction === "IN"
-        ? transfer.amount
-        : transfer.amount.mul(-1);
-    existing.amount = existing.amount.add(delta);
-    totals.set(transfer.tokenId, existing);
-  }
-
-  const holdings = Array.from(totals.values()).filter((item) =>
-    item.amount.abs().greaterThan(0)
+  const tokenIds = Array.from(
+    new Set(groupedTotals.map((group) => group.tokenId))
   );
+  const tokens = tokenIds.length
+    ? await prisma.token.findMany({ where: { id: { in: tokenIds } } })
+    : [];
+  const holdings = buildHoldings(groupedTotals, tokens);
 
   const lastSync = transfers[0]?.blockTime;
-  const extraApiKeys = Array.isArray(settings?.apiKeys)
-    ? (settings?.apiKeys as { name: string; value: string }[])
-    : [];
+  const extraApiKeys = settings?.apiKeys ?? [];
   const moralisApiKey = settings?.moralisApiKey ?? "";
   const formatMoney = (value: { toString(): string } | null) =>
     value ? Number(value.toString()).toFixed(2) : "-";

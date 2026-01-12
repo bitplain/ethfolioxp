@@ -4,8 +4,8 @@
   --font-display: "Trebuchet MS", "Tahoma", sans-serif;
   --text: #0c0f1a;
   --muted: #384152;
-  --desktop-bg: linear-gradient(180deg, #7fc4ff 0%, #4d8fe0 45%, #2f5ea8 100%);
-  --desktop-horizon: linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent 45%);
+  --desktop-bg: url("/wallpapers/windows-xp.jpg") center / cover no-repeat;
+  --desktop-horizon: none;
   --taskbar-bg: linear-gradient(180deg, #2a7be4 0%, #1b56c6 100%);
   --taskbar-edge: #0e3e8d;
   --window-bg: #fefefe;
@@ -30,8 +30,8 @@
   color-scheme: dark;
   --text: #f5f7ff;
   --muted: #b7c3da;
-  --desktop-bg: linear-gradient(180deg, #1b2f55 0%, #0f1f3f 55%, #0a152d 100%);
-  --desktop-horizon: linear-gradient(180deg, rgba(82, 138, 255, 0.2), transparent 50%);
+  --desktop-bg: url("/wallpapers/windows-xp.jpg") center / cover no-repeat;
+  --desktop-horizon: none;
   --taskbar-bg: linear-gradient(180deg, #1e2f58 0%, #14264b 100%);
   --taskbar-edge: #0b1633;
   --window-bg: #101829;
@@ -101,26 +101,9 @@ textarea {
   pointer-events: none;
 }
 
-.desktop-wallpaper::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: var(--desktop-horizon);
-  opacity: 0.9;
-  pointer-events: none;
-}
-
+.desktop-wallpaper::after,
 .desktop-wallpaper::before {
-  content: "";
-  position: absolute;
-  left: -10%;
-  right: -10%;
-  bottom: -20%;
-  height: 55%;
-  background: radial-gradient(circle at 30% 40%, #4cc84a 0%, #23863c 45%, #0f5a2f 70%);
-  border-radius: 50% 50% 0 0;
-  opacity: 0.95;
-  filter: saturate(1.1);
+  content: none;
 }
 
 .login-screen {

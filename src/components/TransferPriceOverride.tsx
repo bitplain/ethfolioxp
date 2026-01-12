@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSettings } from "@/components/desktop/SettingsProvider";
+import { postJson } from "@/lib/http";
 
 export default function TransferPriceOverride({
   transferId,
@@ -34,26 +35,27 @@ export default function TransferPriceOverride({
     }
 
     setLoading(true);
-
-    const response = await fetch("/api/transfers/override", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    try {
+      const result = await postJson("/api/transfers/override", {
         transferId,
         priceUsd: usd.trim(),
         priceRub: rub.trim(),
-      }),
-    });
+      });
 
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setError(data.error || "Ошибка сохранения цены.");
+      if (!result.ok) {
+        const errorMessage =
+          result.data.error ||
+          (result.error
+            ? "Ошибка сети. Проверь соединение."
+            : "Ошибка сохранения цены.");
+        setError(errorMessage);
+        return;
+      }
+
+      setMessage("Цена сохранена.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setMessage("Цена сохранена.");
-    setLoading(false);
   };
 
   return (

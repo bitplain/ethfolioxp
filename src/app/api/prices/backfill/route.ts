@@ -10,8 +10,8 @@ export async function POST() {
   }
 
   try {
-    void backfillMissingPrices(session.user.id);
-    return NextResponse.json({ ok: true, queued: true }, { status: 202 });
+    const result = await backfillMissingPrices(session.user.id);
+    return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Backfill failed." },
