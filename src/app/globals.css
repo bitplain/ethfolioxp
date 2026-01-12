@@ -319,6 +319,7 @@ textarea {
   background: var(--window-bg);
   border: 2px solid var(--window-border);
   border-radius: 10px;
+  min-width: 520px;
   box-shadow: 0 25px 50px rgba(9, 15, 30, 0.35);
   overflow: hidden;
   pointer-events: auto;
@@ -1140,6 +1141,7 @@ textarea {
     transform: none !important;
     width: 100%;
     height: auto !important;
+    min-width: 100%;
     margin-bottom: 16px;
   }
 

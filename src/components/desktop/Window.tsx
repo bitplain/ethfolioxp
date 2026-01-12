@@ -17,6 +17,7 @@ type DragState = {
 type ResizeDirection = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 const TASKBAR_HEIGHT = 44;
 const WINDOW_MARGIN = 12;
+const MIN_WINDOW_WIDTH = 520;
 
 type WindowProps = {
   id: string;
@@ -81,7 +82,8 @@ export default function Window({
     const viewHeight = window.innerHeight - TASKBAR_HEIGHT;
     const maxWidth = Math.max(160, viewWidth - WINDOW_MARGIN * 2);
     const maxHeight = Math.max(200, viewHeight - WINDOW_MARGIN * 2);
-    const nextWidth = Math.min(size.width, maxWidth);
+    const minWidth = Math.min(MIN_WINDOW_WIDTH, maxWidth);
+    const nextWidth = Math.max(minWidth, Math.min(size.width, maxWidth));
     const nextHeight = Math.min(size.height, maxHeight);
     if (nextWidth !== size.width || nextHeight !== size.height) {
       onSizeChange(id, { width: nextWidth, height: nextHeight });
@@ -206,7 +208,7 @@ export default function Window({
       typeof window !== "undefined" ? window.innerHeight - TASKBAR_HEIGHT : 768;
     const maxWidth = Math.max(160, viewWidth - WINDOW_MARGIN * 2);
     const maxHeight = Math.max(200, viewHeight - WINDOW_MARGIN * 2);
-    const minWidth = Math.min(420, maxWidth);
+    const minWidth = Math.min(MIN_WINDOW_WIDTH, maxWidth);
     const minHeight = Math.min(320, maxHeight);
     const dx = event.clientX - startX;
     const dy = event.clientY - startY;
