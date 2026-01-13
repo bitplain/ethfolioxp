@@ -16,7 +16,14 @@ export async function POST(request: Request) {
     const currentPassword = String(body?.currentPassword || "");
     const passwordCheck = validatePassword(String(body?.newPassword ?? ""));
 
-    if (!currentPassword || !passwordCheck.ok) {
+    if (!currentPassword) {
+      return NextResponse.json(
+        { error: "Invalid current or new password." },
+        { status: 400 }
+      );
+    }
+
+    if (!passwordCheck.ok) {
       return NextResponse.json(
         { error: "Invalid current or new password." },
         { status: 400 }
