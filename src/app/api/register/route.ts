@@ -1,6 +1,8 @@
 import { hash } from "bcryptjs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { rateLimit } from "@/lib/rateLimit";
+import { getClientIp } from "@/lib/request";
 import { validateEmail, validatePassword } from "@/lib/validation";
 
 export async function POST(request: Request) {
@@ -18,6 +20,16 @@ export async function POST(request: Request) {
 
     const email = emailCheck.value;
     const password = passwordCheck.value;
+    const ip = getClientIp(request.headers);
+    const ipResult = rateLimit(`register:ip:${ip}`, 10, 60_000);
+    const emailResult = rateLimit(`register:email:${email}`, 5, 60_000);
+
+    if (!ipResult.ok || !emailResult.ok) {
+      return NextResponse.json(
+        { error: "Too many attempts. Try later." },
+        { status: 429 }
+      );
+    }
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
