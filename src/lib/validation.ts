@@ -1,6 +1,8 @@
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function validateEmail(value: string) {
+type ValidationResult<T> = { ok: true; value: T } | { ok: false; error: string };
+
+export function validateEmail(value: string): ValidationResult<string> {
   const email = value.trim().toLowerCase();
   if (!email || email.length > 320 || !EMAIL_RE.test(email)) {
     return { ok: false, error: "Invalid email." };
@@ -8,7 +10,7 @@ export function validateEmail(value: string) {
   return { ok: true, value: email };
 }
 
-export function validatePassword(value: string) {
+export function validatePassword(value: string): ValidationResult<string> {
   const password = value.trim();
   const rules = [
     password.length >= 10,
