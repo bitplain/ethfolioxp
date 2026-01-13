@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useSettings } from "@/components/desktop/SettingsProvider";
 import { postJson } from "@/lib/http";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 
 export default function TransferPriceOverride({
   transferId,
@@ -16,6 +17,7 @@ export default function TransferPriceOverride({
   priceManual: boolean;
 }) {
   const { playSound } = useSettings();
+  const online = useNetworkStatus();
   const [open, setOpen] = useState(false);
   const [usd, setUsd] = useState(priceUsd ?? "");
   const [rub, setRub] = useState(priceRub ?? "");
@@ -67,6 +69,7 @@ export default function TransferPriceOverride({
           playSound("click");
           setOpen((prev) => !prev);
         }}
+        disabled={!online}
       >
         {priceManual ? "Редактировать" : "Задать цену"}
       </button>
@@ -81,6 +84,7 @@ export default function TransferPriceOverride({
             value={usd}
             onChange={(event) => setUsd(event.target.value)}
             placeholder="USD за 1"
+            disabled={!online}
           />
           <input
             className="xp-input"
@@ -91,10 +95,12 @@ export default function TransferPriceOverride({
             value={rub}
             onChange={(event) => setRub(event.target.value)}
             placeholder="RUB за 1"
+            disabled={!online}
           />
+          {!online ? <div className="muted">Нет соединения.</div> : null}
           {error ? <div className="notice">{error}</div> : null}
           {message ? <div className="notice">{message}</div> : null}
-          <button className="xp-button" type="submit" disabled={loading}>
+          <button className="xp-button" type="submit" disabled={loading || !online}>
             {loading ? "Сохраняю..." : "Сохранить"}
           </button>
         </form>

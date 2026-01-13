@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useSettings } from "@/components/desktop/SettingsProvider";
 import { postJson } from "@/lib/http";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 
 type ApiKeyEntry = { name: string; value: string };
 
@@ -14,6 +15,7 @@ export default function ApiKeysForm({
   initialKeys: ApiKeyEntry[];
 }) {
   const { playSound } = useSettings();
+  const online = useNetworkStatus();
   const [moralisApiKey, setMoralisApiKey] = useState(initialMoralisKey);
   const [showMoralisKey, setShowMoralisKey] = useState(false);
   const [keys, setKeys] = useState<ApiKeyEntry[]>(initialKeys);
@@ -79,7 +81,9 @@ export default function ApiKeysForm({
           autoCapitalize="off"
           autoCorrect="off"
           spellCheck={false}
+          disabled={!online}
         />
+        {!online ? <div className="muted">Нет соединения.</div> : null}
         <div className="button-row">
           <button
             className="xp-button secondary"
@@ -88,6 +92,7 @@ export default function ApiKeysForm({
               playSound("click");
               setShowMoralisKey((prev) => !prev);
             }}
+            disabled={!online}
           >
             {showMoralisKey ? "Скрыть" : "Показать"}
           </button>
@@ -107,17 +112,20 @@ export default function ApiKeysForm({
                 placeholder="Название (например, Alchemy)"
                 value={entry.name}
                 onChange={(event) => updateKey(index, "name", event.target.value)}
+                disabled={!online}
               />
               <input
                 className="xp-input"
                 placeholder="API key"
                 value={entry.value}
                 onChange={(event) => updateKey(index, "value", event.target.value)}
+                disabled={!online}
               />
               <button
                 className="xp-button secondary"
                 type="button"
                 onClick={() => removeKey(index)}
+                disabled={!online}
               >
                 Удалить
               </button>
@@ -129,6 +137,7 @@ export default function ApiKeysForm({
             className="xp-button secondary"
             type="button"
             onClick={addKey}
+            disabled={!online}
           >
             Добавить ключ
           </button>
@@ -136,7 +145,7 @@ export default function ApiKeysForm({
       </div>
 
       <div className="button-row">
-        <button className="xp-button" type="submit" disabled={loading}>
+        <button className="xp-button" type="submit" disabled={loading || !online}>
           {loading ? "Сохраняю..." : "Сохранить"}
         </button>
       </div>

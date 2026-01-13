@@ -6,10 +6,12 @@ import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { useSettings } from "@/components/desktop/SettingsProvider";
 import { handleLoginSuccessFlow } from "@/lib/authFlow";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 
 export default function LoginPage() {
   const router = useRouter();
   const { playSound } = useSettings();
+  const online = useNetworkStatus();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +89,8 @@ export default function LoginPage() {
               required
             />
             {error ? <div className="notice">{error}</div> : null}
-            <button className="xp-button" type="submit" disabled={loading}>
+            {!online ? <div className="notice">Нет соединения.</div> : null}
+            <button className="xp-button" type="submit" disabled={loading || !online}>
               {loading ? "Входим..." : "Войти"}
             </button>
             <p className="muted">

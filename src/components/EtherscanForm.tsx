@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useSettings } from "@/components/desktop/SettingsProvider";
 import { postJson } from "@/lib/http";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 
 export default function EtherscanForm({ hasKey }: { hasKey: boolean }) {
   const { playSound } = useSettings();
+  const online = useNetworkStatus();
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -47,8 +49,10 @@ export default function EtherscanForm({ hasKey }: { hasKey: boolean }) {
         autoCapitalize="off"
         autoCorrect="off"
         spellCheck={false}
+        disabled={!online}
         required
       />
+      {!online ? <div className="muted">Нет соединения.</div> : null}
       {hasKey ? (
         <div className="muted">Ключ уже сохранен в базе.</div>
       ) : (
@@ -62,10 +66,11 @@ export default function EtherscanForm({ hasKey }: { hasKey: boolean }) {
             playSound("click");
             setShowKey((prev) => !prev);
           }}
+          disabled={!online}
         >
           {showKey ? "Скрыть" : "Показать"}
         </button>
-        <button className="xp-button" type="submit" disabled={loading}>
+        <button className="xp-button" type="submit" disabled={loading || !online}>
           {loading ? "Сохраняю..." : "Сохранить"}
         </button>
       </div>

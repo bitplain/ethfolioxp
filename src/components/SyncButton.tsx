@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useSettings } from "@/components/desktop/SettingsProvider";
 import { postJson } from "@/lib/http";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 
 export default function SyncButton() {
   const { playSound } = useSettings();
+  const online = useNetworkStatus();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -35,10 +37,14 @@ export default function SyncButton() {
 
   return (
     <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-      <button className="xp-button" onClick={onSync} disabled={loading}>
+      <button className="xp-button" onClick={onSync} disabled={loading || !online}>
         {loading ? "Синхронизация..." : "Синхронизировать"}
       </button>
-      {message ? <span className="muted">{message}</span> : null}
+      {message ? (
+        <span className="muted">{message}</span>
+      ) : !online ? (
+        <span className="muted">Нет соединения.</span>
+      ) : null}
     </div>
   );
 }

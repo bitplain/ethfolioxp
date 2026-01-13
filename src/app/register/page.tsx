@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useState } from "react";
 import { useSettings } from "@/components/desktop/SettingsProvider";
 import { postJson } from "@/lib/http";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 
 export default function RegisterPage() {
   const { playSound } = useSettings();
+  const online = useNetworkStatus();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -85,7 +87,8 @@ export default function RegisterPage() {
             </div>
             {error ? <div className="notice">{error}</div> : null}
             {message ? <div className="notice">{message}</div> : null}
-            <button className="xp-button" type="submit" disabled={loading}>
+            {!online ? <div className="notice">Нет соединения.</div> : null}
+            <button className="xp-button" type="submit" disabled={loading || !online}>
               {loading ? "Создаю..." : "Создать"}
             </button>
             <p className="muted">

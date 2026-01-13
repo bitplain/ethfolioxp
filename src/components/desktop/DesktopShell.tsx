@@ -13,6 +13,7 @@ import ClockApp from "./apps/ClockApp";
 import AboutApp from "./apps/AboutApp";
 import SystemApp from "./apps/SystemApp";
 import AccountApp from "./apps/AccountApp";
+import OfflineBanner from "@/components/OfflineBanner";
 import {
   cascadeLayout,
   clearWindowLayout,
@@ -799,6 +800,7 @@ export default function DesktopShell({
       onContextMenu={handleContextMenu}
     >
       <div className="desktop-wallpaper" aria-hidden />
+      <OfflineBanner />
       <DesktopIcons icons={icons} onOpenWindow={openWindow} />
       <div className="desktop-windows">
         {openWindows.map((config) => {
