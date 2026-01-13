@@ -3,6 +3,7 @@ import { buildBackfillWhere } from "./backfill";
 import { prisma } from "./db";
 import { fetchUsdRubRate } from "./fx";
 import { fetchJson } from "./httpClient";
+import { pickNearbyBucket } from "./prices";
 import { getUserSettings } from "./settings";
 
 const ETH_SYMBOL = "ETH";
@@ -26,6 +27,9 @@ const MORALIS_API_BASE = "https://deep-index.moralis.io/api/v2.2";
 const DEFAULT_MORALIS_API_KEY = process.env.MORALIS_API_KEY;
 const LIVE_FALLBACK_MAX_AGE_SEC = Number(
   process.env.LIVE_FALLBACK_MAX_AGE_SEC || 60 * 60
+);
+const PRICE_FALLBACK_MAX_AGE_SEC = Number(
+  process.env.PRICE_FALLBACK_MAX_AGE_SEC || 72 * 3600
 );
 const BACKFILL_BATCH_SIZE = Number(process.env.BACKFILL_BATCH_SIZE || 150);
 const BACKFILL_MAX_BATCHES = Number(process.env.BACKFILL_MAX_BATCHES || 5);
@@ -332,6 +336,20 @@ async function getPrices(
   let priceRub = priceRubRaw === null ? null : new Prisma.Decimal(priceRubRaw);
 
   if (!priceUsd && !priceRub) {
+    const nearby = await prisma.priceSnapshot.findMany({
+      where: { tokenId: token.id },
+      orderBy: { bucketTs: "desc" },
+      take: 5,
+    });
+    const bucket = pickNearbyBucket(
+      bucketTs,
+      nearby.map((item) => item.bucketTs),
+      PRICE_FALLBACK_MAX_AGE_SEC
+    );
+    const found = nearby.find((item) => item.bucketTs === bucket);
+    if (found) {
+      return { priceUsd: found.priceUsd, priceRub: found.priceRub, bucketTs };
+    }
     return { priceUsd: null, priceRub: null, bucketTs };
   }
 
