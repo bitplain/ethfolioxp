@@ -18,12 +18,15 @@
   --button-border: #6b8fd3;
   --button-shadow: rgba(18, 40, 86, 0.25);
   --accent: #f7b84a;
-  --cursor-default: url("/cursors/xp-arrow.cur"), url("/cursors/xp-arrow.png") 2 2,
+  --cursor-default: url("/cursors/xp-arrow.cur") 2 2,
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M4 3 L4 27 L10 21 L14 30 L18 28 L14 19 L24 19 Z' fill='white' stroke='black' stroke-width='2'/%3E%3C/svg%3E") 1 1,
     default;
-  --cursor-pointer: url("/cursors/xp-hand.cur"), url("/cursors/xp-hand.png") 2 2,
+  --cursor-pointer: url("/cursors/xp-hand.cur") 2 2,
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M4 3 L4 27 L10 21 L14 30 L18 28 L14 19 L24 19 Z' fill='white' stroke='black' stroke-width='2'/%3E%3C/svg%3E") 1 1,
     pointer;
+  --cursor-text: url("/cursors/xp-text.cur") 2 2,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Crect x='14' y='3' width='4' height='26' fill='white' stroke='black' stroke-width='2'/%3E%3C/svg%3E") 1 1,
+    text;
 }
 
 [data-theme="dark"] {
@@ -79,7 +82,7 @@ button {
 
 input,
 textarea {
-  cursor: text;
+  cursor: var(--cursor-text);
 }
 
 .app-body {
@@ -433,7 +436,10 @@ textarea {
   padding: 24px;
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
 }
 
 .window-resize {
@@ -551,12 +557,21 @@ textarea {
 .stack {
   display: grid;
   gap: 16px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.stack > *,
+.grid > * {
+  min-width: 0;
 }
 
 .grid {
   display: grid;
   gap: 16px;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  min-width: 0;
+  max-width: 100%;
 }
 
 .panel {
@@ -565,6 +580,9 @@ textarea {
   border-radius: 12px;
   padding: 16px;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .panel-title {
@@ -587,12 +605,17 @@ textarea {
   border-radius: 12px;
   padding: 12px 14px;
   color: var(--text);
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .button-row {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .xp-button {
@@ -651,6 +674,8 @@ textarea {
   width: 100%;
   overflow-x: auto;
   padding-bottom: 6px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .table-scroll .xp-table {

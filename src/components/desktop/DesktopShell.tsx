@@ -15,11 +15,13 @@ import SystemApp from "./apps/SystemApp";
 import AccountApp from "./apps/AccountApp";
 import {
   cascadeLayout,
+  clearWindowLayout,
   loadWindowLayout,
   saveWindowLayout,
   tileLayout,
 } from "@/lib/windowLayouts";
 import { debounce } from "@/lib/debounce";
+import { clampWindowBounds } from "@/lib/windowBounds";
 
 type WindowConfig = {
   id: string;
@@ -279,6 +281,9 @@ export default function DesktopShell({
     if (!saved) {
       return;
     }
+    const viewWidth = typeof window !== "undefined" ? window.innerWidth : 1024;
+    const viewHeight =
+      typeof window !== "undefined" ? window.innerHeight - TASKBAR_HEIGHT : 768;
     const maxZ = saved.reduce((max, item) => Math.max(max, item.zIndex), 100);
     zCounter.current = maxZ;
     setWindows((prev) =>
@@ -287,11 +292,21 @@ export default function DesktopShell({
         if (!match) {
           return item;
         }
+        const baseSize = match.size?.width ? match.size : item.size;
+        const basePosition = match.position ?? item.position;
+        const clamped = clampWindowBounds({
+          size: baseSize,
+          position: basePosition,
+          viewWidth,
+          viewHeight,
+        });
+        const maximizedBounds = match.isMaximized ? getMaximizedBounds() : null;
+        const nextBounds = maximizedBounds ?? clamped;
         if (item.id === mainId && !mainDefaultOpen) {
           return {
             ...item,
-            position: match.position,
-            size: match.size?.width ? match.size : item.size,
+            position: clamped.position,
+            size: clamped.size,
             zIndex: match.zIndex,
             isOpen: false,
             isMinimized: false,
@@ -300,8 +315,8 @@ export default function DesktopShell({
         }
         return {
           ...item,
-          position: match.position,
-          size: match.size?.width ? match.size : item.size,
+          position: nextBounds.position,
+          size: nextBounds.size,
           zIndex: match.zIndex,
           isOpen: match.isOpen,
           isMinimized: match.isMinimized,
@@ -310,6 +325,56 @@ export default function DesktopShell({
       })
     );
   }, [mainDefaultOpen, mainId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const handleResize = () => {
+      const viewWidth = window.innerWidth;
+      const viewHeight = window.innerHeight - TASKBAR_HEIGHT;
+      setWindows((prev) =>
+        prev.map((item) => {
+          const restore = item.restore
+            ? clampWindowBounds({
+                size: item.restore.size,
+                position: item.restore.position,
+                viewWidth,
+                viewHeight,
+              })
+            : undefined;
+          if (item.isMaximized) {
+            const bounds = getMaximizedBounds();
+            return {
+              ...item,
+              position: bounds.position,
+              size: bounds.size,
+              restore: restore ? { position: restore.position, size: restore.size } : item.restore,
+            };
+          }
+          const clamped = clampWindowBounds({
+            size: item.size,
+            position: item.position,
+            viewWidth,
+            viewHeight,
+          });
+          return {
+            ...item,
+            position: clamped.position,
+            size: clamped.size,
+            restore: restore ? { position: restore.position, size: restore.size } : item.restore,
+          };
+        })
+      );
+    };
+    const handleResizeDebounced = debounce(handleResize, 120);
+    window.addEventListener("resize", handleResizeDebounced);
+    handleResize();
+    return () => {
+      window.removeEventListener("resize", handleResizeDebounced);
+      handleResizeDebounced.cancel();
+    };
+  }, []);
 
   const windowsMap = useMemo(() => {
     const map = new Map<string, WindowState>();
@@ -408,11 +473,20 @@ export default function DesktopShell({
           position: { x: 120, y: 80 },
           size: { width: 760, height: 520 },
         };
+        const viewWidth = typeof window !== "undefined" ? window.innerWidth : 1024;
+        const viewHeight =
+          typeof window !== "undefined" ? window.innerHeight - TASKBAR_HEIGHT : 768;
+        const restored = clampWindowBounds({
+          size: item.restore?.size ?? fallback.size,
+          position: item.restore?.position ?? fallback.position,
+          viewWidth,
+          viewHeight,
+        });
         return {
           ...item,
           isMaximized: false,
-          position: item.restore?.position ?? fallback.position,
-          size: item.restore?.size ?? fallback.size,
+          position: restored.position,
+          size: restored.size,
           restore: undefined,
           zIndex: ++zCounter.current,
         };
@@ -437,31 +511,83 @@ export default function DesktopShell({
   const cascadeWindows = () => {
     const openIds = windows.filter((item) => item.isOpen).map((item) => item.id);
     const next = cascadeLayout(openIds);
+    const viewWidth = typeof window !== "undefined" ? window.innerWidth : 1024;
+    const viewHeight =
+      typeof window !== "undefined" ? window.innerHeight - TASKBAR_HEIGHT : 768;
     setWindows((prev) =>
       prev.map((item) => {
         const found = next.find((layout) => layout.id === item.id);
-        return found
-          ? { ...item, position: found.position, isMaximized: false, restore: undefined }
-          : item;
+        if (!found) {
+          return item;
+        }
+        const clamped = clampWindowBounds({
+          size: item.size,
+          position: found.position,
+          viewWidth,
+          viewHeight,
+        });
+        return {
+          ...item,
+          position: clamped.position,
+          size: clamped.size,
+          isMaximized: false,
+          restore: undefined,
+        };
       })
     );
+  };
+
+  const resetWindowLayout = () => {
+    playSound("click");
+    clearWindowLayout();
+    setWindows((prev) => {
+      const base = createInitialState(windowConfigs);
+      const baseMap = new Map(base.map((item) => [item.id, item]));
+      const next = prev.map((item) => {
+        const fallback = baseMap.get(item.id);
+        if (!fallback) {
+          return item;
+        }
+        return {
+          ...item,
+          position: fallback.position,
+          size: fallback.size,
+          zIndex: fallback.zIndex,
+          isMaximized: false,
+          restore: undefined,
+        };
+      });
+      const maxZ = next.reduce((max, item) => Math.max(max, item.zIndex), 100);
+      zCounter.current = maxZ;
+      return next;
+    });
   };
 
   const tileWindows = () => {
     const openIds = windows.filter((item) => item.isOpen).map((item) => item.id);
     const next = tileLayout(openIds, window.innerWidth, window.innerHeight - 120);
+    const viewWidth = typeof window !== "undefined" ? window.innerWidth : 1024;
+    const viewHeight =
+      typeof window !== "undefined" ? window.innerHeight - TASKBAR_HEIGHT : 768;
     setWindows((prev) =>
       prev.map((item) => {
         const found = next.find((layout) => layout.id === item.id);
-        return found
-          ? {
-              ...item,
-              position: found.position,
-              size: found.size,
-              isMaximized: false,
-              restore: undefined,
-            }
-          : item;
+        if (!found) {
+          return item;
+        }
+        const clamped = clampWindowBounds({
+          size: found.size ?? item.size,
+          position: found.position,
+          viewWidth,
+          viewHeight,
+        });
+        return {
+          ...item,
+          position: clamped.position,
+          size: clamped.size,
+          isMaximized: false,
+          restore: undefined,
+        };
       })
     );
   };
@@ -749,6 +875,16 @@ export default function DesktopShell({
             }}
           >
             Tile Windows
+          </button>
+          <button
+            className="desktop-menu-item"
+            type="button"
+            onClick={() => {
+              resetWindowLayout();
+              setContextMenu((prev) => ({ ...prev, open: false }));
+            }}
+          >
+            Сбросить раскладку
           </button>
           <div className="desktop-menu-divider" />
           <button

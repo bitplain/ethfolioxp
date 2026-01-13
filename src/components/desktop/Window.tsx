@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import {
+  clampWindowBounds,
+  WINDOW_MARGIN,
+  WINDOW_MIN_HEIGHT,
+  WINDOW_MIN_WIDTH,
+} from "@/lib/windowBounds";
 
 type Position = { x: number; y: number };
 
@@ -16,8 +22,6 @@ type DragState = {
 
 type ResizeDirection = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 const TASKBAR_HEIGHT = 44;
-const WINDOW_MARGIN = 12;
-const MIN_WINDOW_WIDTH = 520;
 
 type WindowProps = {
   id: string;
@@ -80,20 +84,17 @@ export default function Window({
     }
     const viewWidth = window.innerWidth;
     const viewHeight = window.innerHeight - TASKBAR_HEIGHT;
-    const maxWidth = Math.max(160, viewWidth - WINDOW_MARGIN * 2);
-    const maxHeight = Math.max(200, viewHeight - WINDOW_MARGIN * 2);
-    const minWidth = Math.min(MIN_WINDOW_WIDTH, maxWidth);
-    const nextWidth = Math.max(minWidth, Math.min(size.width, maxWidth));
-    const nextHeight = Math.min(size.height, maxHeight);
-    if (nextWidth !== size.width || nextHeight !== size.height) {
-      onSizeChange(id, { width: nextWidth, height: nextHeight });
+    const next = clampWindowBounds({
+      size,
+      position,
+      viewWidth,
+      viewHeight,
+    });
+    if (next.size.width !== size.width || next.size.height !== size.height) {
+      onSizeChange(id, next.size);
     }
-    const maxX = Math.max(WINDOW_MARGIN, viewWidth - nextWidth - WINDOW_MARGIN);
-    const maxY = Math.max(WINDOW_MARGIN, viewHeight - nextHeight - WINDOW_MARGIN);
-    const nextX = Math.min(Math.max(position.x, WINDOW_MARGIN), maxX);
-    const nextY = Math.min(Math.max(position.y, WINDOW_MARGIN), maxY);
-    if (nextX !== position.x || nextY !== position.y) {
-      onPositionChange(id, { x: nextX, y: nextY });
+    if (next.position.x !== position.x || next.position.y !== position.y) {
+      onPositionChange(id, next.position);
     }
   }, [
     id,
@@ -145,18 +146,19 @@ export default function Window({
       const viewWidth = typeof window !== "undefined" ? window.innerWidth : 1024;
       const viewHeight = typeof window !== "undefined" ? window.innerHeight - 44 : 768;
       const ratioX = viewWidth ? event.clientX / viewWidth : 0.5;
-      const nextX = Math.max(
-        0,
-        Math.min(viewWidth - restoreSize.width, event.clientX - restoreSize.width * ratioX)
-      );
-      const nextY = Math.max(
-        0,
-        Math.min(viewHeight - restoreSize.height, event.clientY - 24)
-      );
-      onRestoreFromMaximize(id, { x: nextX, y: nextY }, restoreSize);
+      const next = clampWindowBounds({
+        size: restoreSize,
+        position: {
+          x: event.clientX - restoreSize.width * ratioX,
+          y: event.clientY - 24,
+        },
+        viewWidth,
+        viewHeight,
+      });
+      onRestoreFromMaximize(id, next.position, next.size);
       dragState.current = {
-        offsetX: event.clientX - nextX,
-        offsetY: event.clientY - nextY,
+        offsetX: event.clientX - next.position.x,
+        offsetY: event.clientY - next.position.y,
       };
       return;
     }
@@ -167,12 +169,8 @@ export default function Window({
     const viewWidth = typeof window !== "undefined" ? window.innerWidth : 1024;
     const viewHeight =
       typeof window !== "undefined" ? window.innerHeight - TASKBAR_HEIGHT : 768;
-    const maxX = Math.max(WINDOW_MARGIN, viewWidth - size.width - WINDOW_MARGIN);
-    const maxY = Math.max(WINDOW_MARGIN, viewHeight - size.height - WINDOW_MARGIN);
-    onPositionChange(id, {
-      x: Math.min(Math.max(next.x, WINDOW_MARGIN), maxX),
-      y: Math.min(Math.max(next.y, WINDOW_MARGIN), maxY),
-    });
+    const clamped = clampWindowBounds({ size, position: next, viewWidth, viewHeight });
+    onPositionChange(id, clamped.position);
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -208,8 +206,8 @@ export default function Window({
       typeof window !== "undefined" ? window.innerHeight - TASKBAR_HEIGHT : 768;
     const maxWidth = Math.max(160, viewWidth - WINDOW_MARGIN * 2);
     const maxHeight = Math.max(200, viewHeight - WINDOW_MARGIN * 2);
-    const minWidth = Math.min(MIN_WINDOW_WIDTH, maxWidth);
-    const minHeight = Math.min(320, maxHeight);
+    const minWidth = Math.min(WINDOW_MIN_WIDTH, maxWidth);
+    const minHeight = Math.min(WINDOW_MIN_HEIGHT, maxHeight);
     const dx = event.clientX - startX;
     const dy = event.clientY - startY;
 
@@ -241,14 +239,16 @@ export default function Window({
       nextY = startPos.y + (startSize.height - nextHeight);
     }
 
-    const maxX = Math.max(WINDOW_MARGIN, viewWidth - nextWidth - WINDOW_MARGIN);
-    const maxY = Math.max(WINDOW_MARGIN, viewHeight - nextHeight - WINDOW_MARGIN);
-    nextX = Math.min(Math.max(nextX, WINDOW_MARGIN), maxX);
-    nextY = Math.min(Math.max(nextY, WINDOW_MARGIN), maxY);
+    const clamped = clampWindowBounds({
+      size: { width: nextWidth, height: nextHeight },
+      position: { x: nextX, y: nextY },
+      viewWidth,
+      viewHeight,
+    });
 
-    onSizeChange(id, { width: nextWidth, height: nextHeight });
-    if (nextX !== startPos.x || nextY !== startPos.y) {
-      onPositionChange(id, { x: nextX, y: nextY });
+    onSizeChange(id, clamped.size);
+    if (clamped.position.x !== startPos.x || clamped.position.y !== startPos.y) {
+      onPositionChange(id, clamped.position);
     }
   };
 

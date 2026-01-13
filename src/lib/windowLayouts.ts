@@ -36,6 +36,13 @@ export function saveWindowLayout(layout: WindowLayout[]) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(layout));
 }
 
+export function clearWindowLayout() {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.localStorage.removeItem(STORAGE_KEY);
+}
+
 export function cascadeLayout(ids: string[]) {
   return ids.map((id, index) => ({
     id,
