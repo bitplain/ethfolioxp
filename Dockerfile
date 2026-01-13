@@ -9,7 +9,8 @@ RUN npm install
 
 COPY . .
 
-RUN npm run build
+ARG BUILD_DATABASE_URL=postgresql://postgres:postgres@db:5432/portfolio
+RUN DATABASE_URL=${BUILD_DATABASE_URL} npm run build
 
 ENV NODE_ENV=production
 
