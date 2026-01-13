@@ -5,11 +5,12 @@ import EtherscanForm from "@/components/EtherscanForm";
 import ApiKeysForm from "@/components/ApiKeysForm";
 import SyncButton from "@/components/SyncButton";
 import BackfillButton from "@/components/BackfillButton";
-import TransferPriceOverride from "@/components/TransferPriceOverride";
+import TransferTable from "@/components/TransferTable";
 import WalletForm from "@/components/WalletForm";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { buildHoldings } from "@/lib/holdings";
+import { encodeCursor } from "@/lib/pagination";
 import { getUserSettings } from "@/lib/settings";
 
 export default async function DashboardPage() {
@@ -45,8 +46,24 @@ export default async function DashboardPage() {
   const lastSync = transfers[0]?.blockTime;
   const extraApiKeys = settings?.apiKeys ?? [];
   const moralisApiKey = settings?.moralisApiKey ?? "";
-  const formatMoney = (value: { toString(): string } | null) =>
-    value ? Number(value.toString()).toFixed(2) : "-";
+  const lastTransfer = transfers[transfers.length - 1];
+  const initialCursor = lastTransfer
+    ? encodeCursor({ id: lastTransfer.id, ts: lastTransfer.blockTime.getTime() })
+    : null;
+  const initialTransfers = transfers.map((tx) => ({
+    id: tx.id,
+    txHash: tx.txHash,
+    logIndex: tx.logIndex,
+    blockTime: tx.blockTime.toISOString(),
+    direction: tx.direction,
+    amount: tx.amount.toString(),
+    priceUsd: tx.priceUsd?.toString() ?? null,
+    valueUsd: tx.valueUsd?.toString() ?? null,
+    priceRub: tx.priceRub?.toString() ?? null,
+    valueRub: tx.valueRub?.toString() ?? null,
+    priceManual: tx.priceManual,
+    token: { symbol: tx.token.symbol, name: tx.token.name },
+  }));
 
   return (
     <DesktopShell
@@ -157,55 +174,10 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        <div className="panel">
-          <div className="panel-title">Последние транзакции</div>
-          {transfers.length ? (
-            <div className="table-scroll">
-              <table className="xp-table">
-                <thead>
-                  <tr>
-                    <th>Время</th>
-                    <th>Токен</th>
-                    <th>Направление</th>
-                    <th>Количество</th>
-                    <th>Цена (USD)</th>
-                    <th>Сумма (USD)</th>
-                    <th>Цена (RUB)</th>
-                    <th>Сумма (RUB)</th>
-                    <th>Корректировка</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transfers.map((tx: (typeof transfers)[number]) => {
-                    const showRub = tx.direction === "IN";
-                    return (
-                      <tr key={`${tx.txHash}-${tx.logIndex}`}>
-                        <td>{tx.blockTime.toLocaleString("ru-RU")}</td>
-                        <td>{tx.token.symbol}</td>
-                        <td>{tx.direction === "IN" ? "Вход" : "Выход"}</td>
-                        <td>{Number(tx.amount.toString()).toFixed(4)}</td>
-                        <td>{formatMoney(tx.priceUsd)}</td>
-                        <td>{formatMoney(tx.valueUsd)}</td>
-                        <td>{showRub ? formatMoney(tx.priceRub) : "-"}</td>
-                        <td>{showRub ? formatMoney(tx.valueRub) : "-"}</td>
-                        <td>
-                          <TransferPriceOverride
-                            transferId={tx.id}
-                            priceUsd={tx.priceUsd?.toString() ?? null}
-                            priceRub={tx.priceRub?.toString() ?? null}
-                            priceManual={tx.priceManual}
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="muted">Транзакций пока нет.</p>
-          )}
-        </div>
+        <TransferTable
+          initial={initialTransfers}
+          initialCursor={initialCursor}
+        />
       </div>
     </DesktopShell>
   );
