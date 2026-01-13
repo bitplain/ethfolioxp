@@ -1,35 +1,30 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useSettings } from "@/components/desktop/SettingsProvider";
-import { postJson } from "@/lib/http";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
+import { runSync } from "@/lib/syncAction";
 
 export default function SyncButton() {
   const { playSound } = useSettings();
+  const router = useRouter();
   const online = useNetworkStatus();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const onSync = async () => {
     playSound("click");
-    setLoading(true);
-    setMessage(null);
+      setLoading(true);
+      setMessage(null);
     try {
-      const result = await postJson("/api/sync");
-
-      if (!result.ok) {
-        const errorMessage =
-          result.data.error ||
-          (result.error
-            ? "Ошибка сети. Проверь соединение."
-            : "Ошибка синхронизации");
-        setMessage(errorMessage);
-        return;
+      const result = await runSync({
+        onSuccess: () => router.refresh(),
+      });
+      setMessage(result.message);
+      if (result.ok) {
+        playSound("notify");
       }
-
-      playSound("notify");
-      setMessage(`Синхронизировано: +${result.data.created ?? 0} записей.`);
     } finally {
       setLoading(false);
     }
