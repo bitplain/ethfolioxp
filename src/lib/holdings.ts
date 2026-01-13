@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 
-type Group = {
+export type Group = {
   tokenId: string;
   direction: "IN" | "OUT";
   _sum: { amount: Prisma.Decimal | null };

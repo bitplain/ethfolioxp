@@ -1,8 +1,9 @@
 import { Prisma } from "@prisma/client";
 import { buildHoldings } from "../holdings";
+import type { Group } from "../holdings";
 
 test("buildHoldings nets IN and OUT per token and filters zeroes", () => {
-  const groups = [
+  const groups: Group[] = [
     { tokenId: "t1", direction: "IN", _sum: { amount: new Prisma.Decimal("2") } },
     { tokenId: "t1", direction: "OUT", _sum: { amount: new Prisma.Decimal("1.5") } },
     { tokenId: "t2", direction: "OUT", _sum: { amount: new Prisma.Decimal("5") } },
