@@ -1,19 +1,23 @@
 import { hash } from "bcryptjs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { validateEmail, validatePassword } from "@/lib/validation";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const email = String(body?.email || "").toLowerCase();
-    const password = String(body?.password || "");
+    const emailCheck = validateEmail(String(body?.email ?? ""));
+    const passwordCheck = validatePassword(String(body?.password ?? ""));
 
-    if (!email || !password || password.length < 6) {
+    if (!emailCheck.ok || !passwordCheck.ok) {
       return NextResponse.json(
         { error: "Invalid email or password." },
         { status: 400 }
       );
     }
+
+    const email = emailCheck.value;
+    const password = passwordCheck.value;
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {

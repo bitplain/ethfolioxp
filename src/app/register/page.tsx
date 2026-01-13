@@ -74,11 +74,15 @@ export default function RegisterPage() {
             <input
               className="xp-input"
               type="password"
-              placeholder="Пароль (мин. 6 символов)"
+              placeholder="Пароль (мин. 10 символов)"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
+              minLength={10}
               required
             />
+            <div className="muted">
+              Пароль: 10+ символов, буквы в обоих регистрах, цифра и символ.
+            </div>
             {error ? <div className="notice">{error}</div> : null}
             {message ? <div className="notice">{message}</div> : null}
             <button className="xp-button" type="submit" disabled={loading}>

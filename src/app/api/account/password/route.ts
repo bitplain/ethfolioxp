@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { validatePassword } from "@/lib/validation";
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
@@ -13,14 +14,15 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const currentPassword = String(body?.currentPassword || "");
-    const newPassword = String(body?.newPassword || "");
+    const passwordCheck = validatePassword(String(body?.newPassword ?? ""));
 
-    if (!currentPassword || newPassword.length < 6) {
+    if (!currentPassword || !passwordCheck.ok) {
       return NextResponse.json(
         { error: "Invalid current or new password." },
         { status: 400 }
       );
     }
+    const newPassword = passwordCheck.value;
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
