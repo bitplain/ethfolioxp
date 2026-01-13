@@ -72,6 +72,10 @@ docker compose exec web npx prisma db push
 - `GET /api/metrics` — метрики внешних запросов.
 - `POST /api/maintenance/prune-prices` — ручная очистка старых цен.
 
+## Dependency notes
+
+- Prisma зафиксирован на 5.x: в 7.x требуется перенос `DATABASE_URL` в `prisma.config.ts` и переход на драйвер‑адаптеры.
+
 ## Windows XP тема
 
 Интерфейс выполнен в стиле Windows XP с рабочим столом, панелью задач и окнами.
