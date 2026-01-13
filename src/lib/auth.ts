@@ -2,8 +2,11 @@ import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { prisma } from "./db";
+import { assertSecureSecrets } from "./config";
 import { rateLimit } from "./rateLimit";
 import { getClientIp } from "./request";
+
+assertSecureSecrets();
 
 export const authOptions: NextAuthOptions = {
   providers: [

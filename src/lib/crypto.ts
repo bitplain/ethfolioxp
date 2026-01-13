@@ -1,10 +1,11 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { validateSecretValue } from "./config";
 
 const PREFIX = "enc:v1:";
 
 function getKey() {
   const secret = process.env.KEYS_ENCRYPTION_SECRET || process.env.NEXTAUTH_SECRET;
-  if (!secret) {
+  if (!validateSecretValue(secret).ok) {
     return null;
   }
   return createHash("sha256").update(secret).digest();
