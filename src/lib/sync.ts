@@ -3,6 +3,7 @@ import { buildBackfillWhere } from "./backfill";
 import { prisma } from "./db";
 import { fetchUsdRubRate } from "./fx";
 import { fetchJson } from "./httpClient";
+import { log } from "./logger";
 import { pickNearbyBucket } from "./prices";
 import { getUserSettings } from "./settings";
 
@@ -89,6 +90,10 @@ async function fetchEtherscan<T>(params: URLSearchParams, apiKey: string): Promi
 
   const response = await fetchJson<EtherscanResponse<unknown>>(url.toString());
   if (!response.ok) {
+    log("error", "etherscan request failed", {
+      status: response.status,
+      error: response.error ?? null,
+    });
     throw new Error(`Request failed: ${response.status}`);
   }
   const data = response.data;
@@ -99,6 +104,7 @@ async function fetchEtherscan<T>(params: URLSearchParams, apiKey: string): Promi
     }
     const resultMessage = typeof data.result === "string" ? data.result : "";
     const combined = [data.message, resultMessage].filter(Boolean).join(": ");
+    log("warn", "etherscan error", { message: combined || "Etherscan error" });
     throw new Error(combined || "Etherscan error");
   }
 
