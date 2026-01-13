@@ -35,7 +35,7 @@ docker compose exec web npx prisma db push
 - Значения не передаются в Docker Compose и не отображаются вне Settings.
 - `NEXTAUTH_SECRET` — обязательный секрет для подписи сессий.
 - `NEXTAUTH_URL` — публичный URL приложения.
-- `DATABASE_URL` — строка подключения к базе (используется всегда).
+- `DATABASE_URL` — строка подключения к базе; в Docker используйте `db` как host, локально — `localhost`.
 - `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` — нужны, если используешь встроенный контейнер Postgres.
 - `ETHERSCAN_API_BASE` — базовый URL Etherscan API v2.
 - `ETHERSCAN_CHAIN_ID` — chain id (для Ethereum mainnet = 1).
@@ -74,7 +74,7 @@ docker compose exec web npx prisma db push
 
 ## Dependency notes
 
-- Prisma зафиксирован на 5.x: в 7.x требуется перенос `DATABASE_URL` в `prisma.config.ts` и переход на драйвер‑адаптеры.
+- Prisma 7 использует `prisma.config.ts` и adapter‑pg; CLI и runtime берут `DATABASE_URL` без автоматической подмены host.
 
 ## Windows XP тема
 
