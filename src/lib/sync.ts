@@ -2,6 +2,7 @@ import { Prisma, TokenKind, TransferDirection } from "@prisma/client";
 import { buildBackfillWhere } from "./backfill";
 import { prisma } from "./db";
 import { fetchUsdRubRate } from "./fx";
+import { fetchJson } from "./httpClient";
 import { getUserSettings } from "./settings";
 
 const ETH_SYMBOL = "ETH";
@@ -74,14 +75,6 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
-  }
-  return response.json() as Promise<T>;
-}
-
 async function fetchEtherscan<T>(params: URLSearchParams, apiKey: string): Promise<T[]> {
   const url = new URL(ETHERSCAN_API_BASE);
   url.searchParams.set("apikey", apiKey);
@@ -90,7 +83,11 @@ async function fetchEtherscan<T>(params: URLSearchParams, apiKey: string): Promi
     url.searchParams.set(key, value);
   });
 
-  const data = await fetchJson<EtherscanResponse<unknown>>(url.toString());
+  const response = await fetchJson<EtherscanResponse<unknown>>(url.toString());
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status}`);
+  }
+  const data = response.data;
 
   if (data.status === "0") {
     if (data.message.toLowerCase().includes("no transactions")) {
@@ -208,15 +205,11 @@ async function fetchTokenPrice(
 
   const url = `${COINGECKO_API_BASE}${endpoint}?vs_currency=${currency}&from=${from}&to=${to}`;
 
-  try {
-    const data = await fetchJson<{ prices: [number, number][] }>(url);
-    if (!data?.prices?.length) {
-      return null;
-    }
-    return pickClosestPrice(data.prices, targetMs);
-  } catch {
+  const result = await fetchJson<{ prices: [number, number][] }>(url);
+  if (!result.ok || !result.data?.prices?.length) {
     return null;
   }
+  return pickClosestPrice(result.data.prices, targetMs);
 }
 
 async function fetchMoralisPriceUsd(
@@ -234,22 +227,18 @@ async function fetchMoralisPriceUsd(
     `${MORALIS_API_BASE}/erc20/${contractAddress}/price?chain=eth&to_date=` +
     encodeURIComponent(toDate);
 
-  try {
-    const response = await fetch(url, {
-      cache: "no-store",
-      headers: { "X-API-Key": key },
-    });
-    if (!response.ok) {
-      return null;
-    }
-    const data = (await response.json()) as { usdPrice?: number | string };
-    const raw =
-      typeof data.usdPrice === "number" ? data.usdPrice : Number(data.usdPrice);
-    if (Number.isFinite(raw) && raw > 0) {
-      return raw;
-    }
-  } catch {
+  const result = await fetchJson<{ usdPrice?: number | string }>(url, {
+    init: { headers: { "X-API-Key": key } },
+  });
+  if (!result.ok) {
     return null;
+  }
+  const raw =
+    typeof result.data.usdPrice === "number"
+      ? result.data.usdPrice
+      : Number(result.data.usdPrice);
+  if (Number.isFinite(raw) && raw > 0) {
+    return raw;
   }
 
   return null;
@@ -258,32 +247,28 @@ async function fetchMoralisPriceUsd(
 async function fetchDexscreenerPriceUsd(contractAddress: string) {
   const url = `https://api.dexscreener.com/latest/dex/tokens/${contractAddress}`;
 
-  try {
-    const data = await fetchJson<{
-      pairs?: { priceUsd?: string; liquidity?: { usd?: number } }[];
-    }>(url);
-    const pairs = data?.pairs ?? [];
-    if (!pairs.length) {
-      return null;
-    }
-
-    const best = pairs
-      .filter((pair) => pair.priceUsd)
-      .sort(
-        (a, b) =>
-          (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0)
-      )[0];
-
-    if (!best?.priceUsd) {
-      return null;
-    }
-
-    const price = Number(best.priceUsd);
-    if (Number.isFinite(price) && price > 0) {
-      return price;
-    }
-  } catch {
+  const result = await fetchJson<{
+    pairs?: { priceUsd?: string; liquidity?: { usd?: number } }[];
+  }>(url);
+  if (!result.ok) {
     return null;
+  }
+  const pairs = result.data?.pairs ?? [];
+  if (!pairs.length) {
+    return null;
+  }
+
+  const best = pairs
+    .filter((pair) => pair.priceUsd)
+    .sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))[0];
+
+  if (!best?.priceUsd) {
+    return null;
+  }
+
+  const price = Number(best.priceUsd);
+  if (Number.isFinite(price) && price > 0) {
+    return price;
   }
 
   return null;

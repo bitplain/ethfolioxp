@@ -1,3 +1,5 @@
+import { fetchJson } from "@/lib/httpClient";
+
 const FX_CACHE = new Map<number, number>();
 
 function toIsoDate(timestampSec: number) {
@@ -14,19 +16,16 @@ export async function fetchUsdRubRate(timestampSec: number) {
   const date = toIsoDate(timestampSec);
   const url = `https://api.exchangerate.host/${date}?base=USD&symbols=RUB`;
 
-  try {
-    const response = await fetch(url, { cache: "no-store" });
-    if (!response.ok) {
-      return null;
-    }
-    const data = (await response.json()) as { rates?: { RUB?: number } };
-    const rate = data?.rates?.RUB;
-    if (rate) {
-      FX_CACHE.set(cacheKey, rate);
-      return rate;
-    }
-  } catch {
+  const result = await fetchJson<{ rates?: { RUB?: number } }>(url, {
+    cacheTtlMs: 3600_000,
+  });
+  if (!result.ok) {
     return null;
+  }
+  const rate = result.data?.rates?.RUB;
+  if (rate) {
+    FX_CACHE.set(cacheKey, rate);
+    return rate;
   }
 
   return null;
