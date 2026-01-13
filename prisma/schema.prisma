@@ -76,6 +76,8 @@ model Transfer {
   token  Token  @relation(fields: [tokenId], references: [id])
 
   @@unique([txHash, tokenId, logIndex])
+  @@index([userId, blockTime])
+  @@index([userId, tokenId])
 }
 
 model PriceSnapshot {
@@ -89,6 +91,7 @@ model PriceSnapshot {
   token Token @relation(fields: [tokenId], references: [id])
 
   @@unique([tokenId, bucketTs])
+  @@index([bucketTs])
 }
 
 model UserSettings {
