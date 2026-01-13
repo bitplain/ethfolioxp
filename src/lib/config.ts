@@ -11,6 +11,9 @@ export function assertSecureSecrets() {
   if (process.env.NODE_ENV !== "production") {
     return;
   }
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return;
+  }
   const nextAuth = validateSecretValue(process.env.NEXTAUTH_SECRET);
   const keys = validateSecretValue(
     process.env.KEYS_ENCRYPTION_SECRET || process.env.NEXTAUTH_SECRET
