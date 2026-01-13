@@ -5,7 +5,7 @@ const PREFIX = "enc:v1:";
 
 function getKey() {
   const secret = process.env.KEYS_ENCRYPTION_SECRET || process.env.NEXTAUTH_SECRET;
-  if (!validateSecretValue(secret).ok) {
+  if (!secret || !validateSecretValue(secret).ok) {
     return null;
   }
   return createHash("sha256").update(secret).digest();
