@@ -41,6 +41,11 @@ docker compose exec web npx prisma db push
 - `ETHERSCAN_CHAIN_ID` — chain id (для Ethereum mainnet = 1).
 - `COINGECKO_API_BASE` — база CoinGecko (обычно не меняется).
 - `PRICE_BUCKET_SECONDS` — шаг кеширования цены (по умолчанию 3600 сек).
+- `PRICE_FALLBACK_MAX_AGE_SEC` — максимум “старой” цены при падении источников (по умолчанию 72 часа).
+- `HTTP_TIMEOUT_MS` — таймаут внешних запросов (по умолчанию 8000 мс).
+- `HTTP_RETRY_COUNT` — число ретраев внешних запросов (по умолчанию 2).
+- `HTTP_RETRY_BASE_MS` — базовая задержка ретраев (по умолчанию 250 мс).
+- `HTTP_CACHE_TTL_MS` — in-memory кеш внешних GET запросов (по умолчанию 0).
 
 ## Timeweb Cloud Apps
 
@@ -60,6 +65,12 @@ docker compose exec web npx prisma db push
 Данные сохраняются в Postgres и отображаются в таблице.
 
 Ключ Etherscan можно вводить вручную в настройках — он будет сохранен для пользователя.
+
+## Сервисные эндпоинты
+
+- `GET /api/health` — health check (опция `?db=1` для проверки БД).
+- `GET /api/metrics` — метрики внешних запросов.
+- `POST /api/maintenance/prune-prices` — ручная очистка старых цен.
 
 ## Windows XP тема
 
