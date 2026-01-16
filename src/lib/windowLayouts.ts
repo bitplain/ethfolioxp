@@ -1,3 +1,5 @@
+import { migrateStorageKey } from "@/lib/storage";
+
 export type WindowLayout = {
   id: string;
   position: { x: number; y: number };
@@ -8,18 +10,22 @@ export type WindowLayout = {
   isMaximized?: boolean;
 };
 
-const STORAGE_KEY = "ethfolio.windowLayout";
+const LEGACY_STORAGE_KEY = "ethfolio.windowLayout";
+const STORAGE_KEY = "retrodesk.windowLayout";
 
 export function loadWindowLayout(): WindowLayout[] | null {
   if (typeof window === "undefined") {
     return null;
   }
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
+    const parsed = migrateStorageKey<WindowLayout[]>({
+      storage: window.localStorage,
+      oldKey: LEGACY_STORAGE_KEY,
+      newKey: STORAGE_KEY,
+    });
+    if (!parsed) {
       return null;
     }
-    const parsed = JSON.parse(raw) as WindowLayout[];
     if (!Array.isArray(parsed)) {
       return null;
     }

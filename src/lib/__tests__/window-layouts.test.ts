@@ -42,3 +42,27 @@ test("clearWindowLayout removes saved layout", () => {
   clearWindowLayout();
   expect(loadWindowLayout()).toBeNull();
 });
+
+test("loadWindowLayout migrates legacy key", () => {
+  const payload = [
+    {
+      id: "ethfolio",
+      position: { x: 120, y: 80 },
+      size: { width: 760, height: 520 },
+      zIndex: 101,
+      isOpen: true,
+      isMinimized: false,
+      isMaximized: false,
+    },
+  ];
+
+  window.localStorage.setItem("ethfolio.windowLayout", JSON.stringify(payload));
+
+  const result = loadWindowLayout();
+
+  expect(result).toEqual(payload);
+  expect(window.localStorage.getItem("retrodesk.windowLayout")).toBe(
+    JSON.stringify(payload)
+  );
+  expect(window.localStorage.getItem("ethfolio.windowLayout")).toBe(null);
+});
