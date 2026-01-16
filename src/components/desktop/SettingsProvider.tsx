@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { migrateStorageKey } from "@/lib/storage";
 
 type ThemeMode = "light" | "dark";
 
@@ -24,7 +25,8 @@ type SettingsContextValue = SettingsState & {
   ) => Promise<void>;
 };
 
-const STORAGE_KEY = "ethfolio.settings";
+const LEGACY_STORAGE_KEY = "ethfolio.settings";
+const STORAGE_KEY = "retrodesk.settings";
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
@@ -39,11 +41,14 @@ function loadSettings(): SettingsState {
   }
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
+    const parsed = migrateStorageKey<Partial<SettingsState>>({
+      storage: window.localStorage,
+      oldKey: LEGACY_STORAGE_KEY,
+      newKey: STORAGE_KEY,
+    });
+    if (!parsed) {
       return defaultSettings;
     }
-    const parsed = JSON.parse(raw) as Partial<SettingsState>;
     return {
       theme: parsed.theme === "dark" ? "dark" : "light",
       soundEnabled: typeof parsed.soundEnabled === "boolean" ? parsed.soundEnabled : true,

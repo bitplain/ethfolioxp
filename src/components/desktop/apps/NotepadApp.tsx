@@ -1,14 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { migrateStorageKey } from "@/lib/storage";
 
-const STORAGE_KEY = "ethfolio.notepad";
+const LEGACY_STORAGE_KEY = "ethfolio.notepad";
+const STORAGE_KEY = "retrodesk.notepad";
 
 export default function NotepadApp() {
   const [value, setValue] = useState("");
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
+    const saved = migrateStorageKey<string>({
+      storage: window.localStorage,
+      oldKey: LEGACY_STORAGE_KEY,
+      newKey: STORAGE_KEY,
+      parse: (raw) => raw,
+      serialize: (next) => next,
+    });
     if (saved) {
       setValue(saved);
     }
