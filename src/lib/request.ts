@@ -15,6 +15,10 @@ function readHeader(headers: Headers | Record<string, HeaderValue> | undefined, 
 }
 
 export function getClientIp(headers?: Headers | Record<string, HeaderValue>) {
+  const trustProxy = process.env.TRUST_PROXY === "1";
+  if (!trustProxy) {
+    return "unknown";
+  }
   const forwarded = readHeader(headers, "x-forwarded-for");
   if (forwarded) {
     return forwarded.split(",")[0]?.trim() || "unknown";

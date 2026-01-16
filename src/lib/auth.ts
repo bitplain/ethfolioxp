@@ -43,16 +43,23 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        return { id: user.id, email: user.email };
+        return { id: user.id, email: user.email, role: user.role };
       },
     }),
   ],
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   callbacks: {
+    async jwt({ token, user }) {
+      if (user?.role) {
+        token.role = user.role;
+      }
+      return token;
+    },
     async session({ session, token }) {
       if (session.user && token.sub) {
         session.user.id = token.sub;
+        session.user.role = token.role === "ADMIN" ? "ADMIN" : "USER";
       }
       return session;
     },
