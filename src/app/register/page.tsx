@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { useSettings } from "@/components/desktop/SettingsProvider";
@@ -44,10 +45,13 @@ export default function RegisterPage() {
       <div className="login-panel">
         <div className="login-hero">
           <div className="login-brand">
-            <span
+            <Image
               className="login-brand-icon"
-              style={{ backgroundImage: "url(/icons/xp/window.png)" }}
-              aria-hidden
+              src="/icons/xp/window.png"
+              alt=""
+              width={48}
+              height={48}
+              priority
             />
             <div>
               <div className="login-brand-title">RetroDesk</div>

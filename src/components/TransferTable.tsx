@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import TransferPriceOverride from "@/components/TransferPriceOverride";
 import { getJson } from "@/lib/http";
 import { scheduleIdle } from "@/lib/idle";
@@ -21,7 +21,7 @@ type TransferRow = {
   token: { symbol: string; name: string };
 };
 
-export default function TransferTable({
+function TransferTable({
   initial,
   initialCursor,
 }: {
@@ -180,3 +180,5 @@ export default function TransferTable({
     </div>
   );
 }
+
+export default memo(TransferTable);

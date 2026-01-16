@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSettings } from "./SettingsProvider";
 import DesktopIcons, { DesktopIcon } from "./DesktopIcons";
@@ -80,7 +81,7 @@ function createInitialState(configs: WindowConfig[]): WindowState[] {
   }));
 }
 
-export default function DesktopShell({
+function DesktopShell({
   children,
   mainTitle,
   mainSubtitle,
@@ -110,7 +111,9 @@ export default function DesktopShell({
     y: number;
   }>({ open: false, x: 0, y: 0 });
   const zCounter = useRef(100);
-  const saveLayout = useMemo(() => debounce(saveWindowLayout, 250), []);
+  const saveLayoutRef = useRef(debounce(saveWindowLayout, 250));
+
+  useEffect(() => () => saveLayoutRef.current.cancel(), []);
 
   const windowConfigs = useMemo<WindowConfig[]>(() => {
     const baseConfigs: WindowConfig[] = [
@@ -383,117 +386,175 @@ export default function DesktopShell({
     return map;
   }, [windows]);
 
-  const openWindow = (id: string) => {
-    playSound("notify");
-    setWindows((prev) => {
-      const exists = prev.some((item) => item.id === id);
-      if (!exists) {
-        return prev;
-      }
-      return prev.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              isOpen: true,
-              isMinimized: false,
-              zIndex: ++zCounter.current,
-            }
-          : item
-      );
-    });
-  };
-
-  const closeWindow = (id: string) => {
-    playSound("click");
-    setWindows((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, isOpen: false, isMinimized: false } : item
-      )
-    );
-  };
-
-  const toggleMinimize = (id: string) => {
-    setWindows((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) {
-          return item;
-        }
-        playSound(item.isMinimized ? "restore" : "minimize");
-        return {
-          ...item,
-          isMinimized: !item.isMinimized,
-          zIndex: item.isMinimized ? ++zCounter.current : item.zIndex,
-        };
-      })
-    );
-  };
-
-  const focusWindow = (id: string) => {
-    setWindows((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? { ...item, isMinimized: false, zIndex: ++zCounter.current }
-          : item
-      )
-    );
-  };
-
-  const updatePosition = (id: string, position: { x: number; y: number }) => {
-    setWindows((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, position } : item))
-    );
-  };
-
-  const updateSize = (id: string, size: { width: number; height: number }) => {
-    setWindows((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, size } : item))
-    );
-  };
-
-  const toggleMaximize = (id: string) => {
-    playSound("restore");
-    setWindows((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) {
-          return item;
-        }
-        if (!item.isMaximized) {
-          const bounds = getMaximizedBounds();
+  const openWindow = useCallback(
+    (id: string) => {
+      playSound("notify");
+      setWindows((prev) => {
+        let changed = false;
+        const next = prev.map((item) => {
+          if (item.id !== id) {
+            return item;
+          }
+          if (item.isOpen && !item.isMinimized) {
+            changed = true;
+            return { ...item, zIndex: ++zCounter.current };
+          }
+          changed = true;
           return {
             ...item,
             isOpen: true,
             isMinimized: false,
-            isMaximized: true,
-            restore: { position: item.position, size: item.size },
-            position: bounds.position,
-            size: bounds.size,
             zIndex: ++zCounter.current,
           };
-        }
-        const fallback = {
-          position: { x: 120, y: 80 },
-          size: { width: 760, height: 520 },
-        };
-        const viewWidth = typeof window !== "undefined" ? window.innerWidth : 1024;
-        const viewHeight =
-          typeof window !== "undefined" ? window.innerHeight - TASKBAR_HEIGHT : 768;
-        const restored = clampWindowBounds({
-          size: item.restore?.size ?? fallback.size,
-          position: item.restore?.position ?? fallback.position,
-          viewWidth,
-          viewHeight,
         });
-        return {
-          ...item,
-          isMaximized: false,
-          position: restored.position,
-          size: restored.size,
-          restore: undefined,
-          zIndex: ++zCounter.current,
-        };
-      })
-    );
-  };
+        return changed ? next : prev;
+      });
+    },
+    [playSound]
+  );
+
+  const closeWindow = useCallback(
+    (id: string) => {
+      playSound("click");
+      setWindows((prev) => {
+        let changed = false;
+        const next = prev.map((item) => {
+          if (item.id !== id) {
+            return item;
+          }
+          if (!item.isOpen && !item.isMinimized) {
+            return item;
+          }
+          changed = true;
+          return { ...item, isOpen: false, isMinimized: false };
+        });
+        return changed ? next : prev;
+      });
+    },
+    [playSound]
+  );
+
+  const toggleMinimize = useCallback(
+    (id: string) => {
+      setWindows((prev) => {
+        let changed = false;
+        const next = prev.map((item) => {
+          if (item.id !== id) {
+            return item;
+          }
+          changed = true;
+          playSound(item.isMinimized ? "restore" : "minimize");
+          return {
+            ...item,
+            isMinimized: !item.isMinimized,
+            zIndex: item.isMinimized ? ++zCounter.current : item.zIndex,
+          };
+        });
+        return changed ? next : prev;
+      });
+    },
+    [playSound]
+  );
+
+  const focusWindow = useCallback((id: string) => {
+    setWindows((prev) => {
+      let changed = false;
+      const next = prev.map((item) =>
+        item.id === id
+          ? (() => {
+              if (!item.isMinimized && item.zIndex === zCounter.current) {
+                return item;
+              }
+              changed = true;
+              return { ...item, isMinimized: false, zIndex: ++zCounter.current };
+            })()
+          : item
+      );
+      return changed ? next : prev;
+    });
+  }, []);
+
+  const updatePosition = useCallback((id: string, position: { x: number; y: number }) => {
+    setWindows((prev) => {
+      let changed = false;
+      const next = prev.map((item) => {
+        if (item.id !== id) {
+          return item;
+        }
+        if (item.position.x === position.x && item.position.y === position.y) {
+          return item;
+        }
+        changed = true;
+        return { ...item, position };
+      });
+      return changed ? next : prev;
+    });
+  }, []);
+
+  const updateSize = useCallback((id: string, size: { width: number; height: number }) => {
+    setWindows((prev) => {
+      let changed = false;
+      const next = prev.map((item) => {
+        if (item.id !== id) {
+          return item;
+        }
+        if (item.size.width === size.width && item.size.height === size.height) {
+          return item;
+        }
+        changed = true;
+        return { ...item, size };
+      });
+      return changed ? next : prev;
+    });
+  }, []);
+
+  const toggleMaximize = useCallback(
+    (id: string) => {
+      playSound("restore");
+      setWindows((prev) =>
+        prev.map((item) => {
+          if (item.id !== id) {
+            return item;
+          }
+          if (!item.isMaximized) {
+            const bounds = getMaximizedBounds();
+            return {
+              ...item,
+              isOpen: true,
+              isMinimized: false,
+              isMaximized: true,
+              restore: { position: item.position, size: item.size },
+              position: bounds.position,
+              size: bounds.size,
+              zIndex: ++zCounter.current,
+            };
+          }
+          const fallback = {
+            position: { x: 120, y: 80 },
+            size: { width: 760, height: 520 },
+          };
+          const viewWidth = typeof window !== "undefined" ? window.innerWidth : 1024;
+          const viewHeight =
+            typeof window !== "undefined" ? window.innerHeight - TASKBAR_HEIGHT : 768;
+          const restored = clampWindowBounds({
+            size: item.restore?.size ?? fallback.size,
+            position: item.restore?.position ?? fallback.position,
+            viewWidth,
+            viewHeight,
+          });
+          return {
+            ...item,
+            isMaximized: false,
+            position: restored.position,
+            size: restored.size,
+            restore: undefined,
+            zIndex: ++zCounter.current,
+          };
+        })
+      );
+    },
+    [playSound]
+  );
 
   useEffect(() => {
     const payload = windows.map((item) => ({
@@ -505,18 +566,17 @@ export default function DesktopShell({
       isMinimized: item.isMinimized,
       isMaximized: item.isMaximized,
     }));
-    saveLayout(payload);
-    return () => saveLayout.cancel();
-  }, [saveLayout, windows]);
+    saveLayoutRef.current(payload);
+  }, [windows]);
 
-  const cascadeWindows = () => {
-    const openIds = windows.filter((item) => item.isOpen).map((item) => item.id);
-    const next = cascadeLayout(openIds);
+  const cascadeWindows = useCallback(() => {
     const viewWidth = typeof window !== "undefined" ? window.innerWidth : 1024;
     const viewHeight =
       typeof window !== "undefined" ? window.innerHeight - TASKBAR_HEIGHT : 768;
-    setWindows((prev) =>
-      prev.map((item) => {
+    setWindows((prev) => {
+      const openIds = prev.filter((item) => item.isOpen).map((item) => item.id);
+      const next = cascadeLayout(openIds);
+      return prev.map((item) => {
         const found = next.find((layout) => layout.id === item.id);
         if (!found) {
           return item;
@@ -534,11 +594,11 @@ export default function DesktopShell({
           isMaximized: false,
           restore: undefined,
         };
-      })
-    );
-  };
+      });
+    });
+  }, []);
 
-  const resetWindowLayout = () => {
+  const resetWindowLayout = useCallback(() => {
     playSound("click");
     clearWindowLayout();
     setWindows((prev) => {
@@ -562,16 +622,19 @@ export default function DesktopShell({
       zCounter.current = maxZ;
       return next;
     });
-  };
+  }, [playSound, windowConfigs]);
 
-  const tileWindows = () => {
-    const openIds = windows.filter((item) => item.isOpen).map((item) => item.id);
-    const next = tileLayout(openIds, window.innerWidth, window.innerHeight - 120);
+  const tileWindows = useCallback(() => {
     const viewWidth = typeof window !== "undefined" ? window.innerWidth : 1024;
     const viewHeight =
       typeof window !== "undefined" ? window.innerHeight - TASKBAR_HEIGHT : 768;
-    setWindows((prev) =>
-      prev.map((item) => {
+    const layoutWidth = typeof window !== "undefined" ? window.innerWidth : viewWidth;
+    const layoutHeight =
+      typeof window !== "undefined" ? window.innerHeight - 120 : viewHeight - 120;
+    setWindows((prev) => {
+      const openIds = prev.filter((item) => item.isOpen).map((item) => item.id);
+      const next = tileLayout(openIds, layoutWidth, layoutHeight);
+      return prev.map((item) => {
         const found = next.find((layout) => layout.id === item.id);
         if (!found) {
           return item;
@@ -589,11 +652,11 @@ export default function DesktopShell({
           isMaximized: false,
           restore: undefined,
         };
-      })
-    );
-  };
+      });
+    });
+  }, []);
 
-  const handleContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
+  const handleContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
     if (
       target.closest(".window") ||
@@ -604,202 +667,273 @@ export default function DesktopShell({
     }
     event.preventDefault();
     setContextMenu({ open: true, x: event.clientX, y: event.clientY });
-  };
+  }, []);
 
-  const openWindows = windowConfigs.filter((config) => {
-    const state = windowsMap.get(config.id);
-    return state?.isOpen;
-  });
+  const closeMenus = useCallback(() => {
+    setStartOpen(false);
+    setContextMenu((prev) => ({ ...prev, open: false }));
+  }, []);
 
-  const activeOpen = windows.filter((item) => item.isOpen && !item.isMinimized);
-  const activeId = activeOpen.length
-    ? activeOpen.reduce((top, item) => (item.zIndex >= top.zIndex ? item : top))
-        .id
-    : undefined;
+  const closeStart = useCallback(() => setStartOpen(false), []);
 
-  const ethfolioAction: { type: "window"; target: string } | { type: "route"; target: string } =
-    mainId === "ethfolio"
-      ? { type: "window", target: "ethfolio" }
-      : { type: "route", target: "/dashboard" };
+  const toggleStart = useCallback(() => setStartOpen((prev) => !prev), []);
 
-  const icons: DesktopIcon[] = [
-    {
-      id: "ethfolio",
-      label: "Ethfolio",
-      variant: "app",
-      action: ethfolioAction,
-    },
-    {
-      id: "computer",
-      label: "My Computer",
-      variant: "pc",
-      action: { type: "window", target: "computer" },
-    },
-    {
-      id: "network",
-      label: "Network",
-      variant: "network",
-      action: { type: "window", target: "network" },
-    },
-    {
-      id: "docs",
-      label: "My Docs",
-      variant: "docs",
-      action: { type: "window", target: "docs" },
-    },
-    {
-      id: "recycle",
-      label: "Recycle Bin",
-      variant: "recycle",
-      action: { type: "window", target: "recycle" },
-    },
-  ];
+  const openWindows = useMemo(
+    () =>
+      windowConfigs.filter((config) => {
+        const state = windowsMap.get(config.id);
+        return state?.isOpen;
+      }),
+    [windowConfigs, windowsMap]
+  );
 
-  const startLeft: StartMenuItem[] = [
-    {
-      id: "start-ethfolio",
-      label: "Ethfolio",
-      description: "Открыть портфель",
-      icon: "/icons/xp/eth.svg",
-      action: ethfolioAction,
-    },
-    {
-      id: "start-sync",
-      label: "Sync Center",
-      description: "Синхронизация кошелька",
-      icon: "/icons/xp/programs.png",
-      action: { type: "window", target: "sync" },
-    },
-    {
-      id: "start-settings",
-      label: "Settings",
-      description: "Кошелек и интерфейс",
-      icon: "/icons/xp/monitor.png",
-      action: { type: "window", target: "settings" },
-    },
-    {
-      id: "start-notepad",
-      label: "Notepad",
-      description: "Заметки",
-      icon: "/icons/xp/docs.png",
-      action: { type: "window", target: "notepad" },
-    },
-    {
-      id: "start-calculator",
-      label: "Calculator",
-      description: "Быстрые расчеты",
-      icon: "/icons/xp/window.png",
-      action: { type: "window", target: "calculator" },
-    },
-  ];
+  const activeId = useMemo(() => {
+    const activeOpen = windows.filter((item) => item.isOpen && !item.isMinimized);
+    return activeOpen.length
+      ? activeOpen.reduce((top, item) => (item.zIndex >= top.zIndex ? item : top)).id
+      : undefined;
+  }, [windows]);
 
-  const startRight: StartMenuItem[] = [
-    {
-      id: "start-docs",
-      label: "My Documents",
-      description: "Файлы пользователя",
-      icon: "/icons/xp/folder.png",
-      action: { type: "window", target: "docs" },
-    },
-    {
-      id: "start-internet",
-      label: "Internet",
-      description: "Сеть и браузер",
-      icon: "/icons/xp/internet.png",
-      action: { type: "window", target: "network" },
-    },
-    {
-      id: "start-computer",
-      label: "My Computer",
-      description: "Системные ресурсы",
-      icon: "/icons/xp/my-computer.png",
-      action: { type: "window", target: "computer" },
-    },
-    {
-      id: "start-network",
-      label: "Network",
-      description: "Сетевые подключения",
-      icon: "/icons/xp/network.png",
-      action: { type: "window", target: "network" },
-    },
-    {
-      id: "start-control",
-      label: "Control Panel",
-      description: "Системные настройки",
-      icon: "/icons/xp/monitor.png",
-      action: { type: "window", target: "control-panel" },
-    },
-    {
-      id: "start-recycle",
-      label: "Recycle Bin",
-      description: "Корзина",
-      icon: "/icons/xp/recycle.png",
-      action: { type: "window", target: "recycle" },
-    },
-    {
-      id: "start-about",
-      label: "About",
-      description: "О программе",
-      icon: "/icons/xp/window.png",
-      action: { type: "window", target: "about" },
-    },
-  ];
+  const ethfolioAction = useMemo<
+    { type: "window"; target: string } | { type: "route"; target: string }
+  >(
+    () =>
+      mainId === "ethfolio"
+        ? { type: "window", target: "ethfolio" }
+        : { type: "route", target: "/dashboard" },
+    [mainId]
+  );
 
-  const programItems: StartMenuItem[] = [
-    {
-      id: "program-ethfolio",
-      label: "Ethfolio",
-      description: "Основное окно",
-      icon: "/icons/xp/eth.svg",
-      action: ethfolioAction,
+  const handleRestoreFromMaximize = useCallback(
+    (id: string, position: { x: number; y: number }, size: { width: number; height: number }) => {
+      setWindows((prev) =>
+        prev.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                isMaximized: false,
+                position,
+                size,
+                restore: undefined,
+                zIndex: ++zCounter.current,
+              }
+            : item
+        )
+      );
     },
-    {
-      id: "program-notepad",
-      label: "Notepad",
-      description: "Заметки",
-      icon: "/icons/xp/docs.png",
-      action: { type: "window", target: "notepad" },
-    },
-    {
-      id: "program-calculator",
-      label: "Calculator",
-      description: "Калькулятор",
-      icon: "/icons/xp/window.png",
-      action: { type: "window", target: "calculator" },
-    },
-    {
-      id: "program-clock",
-      label: "Clock",
-      description: "Часы",
-      icon: "/icons/xp/monitor.png",
-      action: { type: "window", target: "clock" },
-    },
-    {
-      id: "program-control",
-      label: "Control Panel",
-      description: "Системные настройки",
-      icon: "/icons/xp/monitor.png",
-      action: { type: "window", target: "control-panel" },
-    },
-    {
-      id: "program-settings",
-      label: "Settings",
-      description: "Кошелек и интерфейс",
-      icon: "/icons/xp/monitor.png",
-      action: { type: "window", target: "settings" },
-    },
-  ];
+    []
+  );
+
+  const icons = useMemo<DesktopIcon[]>(
+    () => [
+      {
+        id: "ethfolio",
+        label: "Ethfolio",
+        variant: "app",
+        action: ethfolioAction,
+      },
+      {
+        id: "computer",
+        label: "My Computer",
+        variant: "pc",
+        action: { type: "window", target: "computer" },
+      },
+      {
+        id: "network",
+        label: "Network",
+        variant: "network",
+        action: { type: "window", target: "network" },
+      },
+      {
+        id: "docs",
+        label: "My Docs",
+        variant: "docs",
+        action: { type: "window", target: "docs" },
+      },
+      {
+        id: "recycle",
+        label: "Recycle Bin",
+        variant: "recycle",
+        action: { type: "window", target: "recycle" },
+      },
+    ],
+    [ethfolioAction]
+  );
+
+  const startLeft = useMemo<StartMenuItem[]>(
+    () => [
+      {
+        id: "start-ethfolio",
+        label: "Ethfolio",
+        description: "Открыть портфель",
+        icon: "/icons/xp/eth.svg",
+        action: ethfolioAction,
+      },
+      {
+        id: "start-sync",
+        label: "Sync Center",
+        description: "Синхронизация кошелька",
+        icon: "/icons/xp/programs.png",
+        action: { type: "window", target: "sync" },
+      },
+      {
+        id: "start-settings",
+        label: "Settings",
+        description: "Кошелек и интерфейс",
+        icon: "/icons/xp/monitor.png",
+        action: { type: "window", target: "settings" },
+      },
+      {
+        id: "start-notepad",
+        label: "Notepad",
+        description: "Заметки",
+        icon: "/icons/xp/docs.png",
+        action: { type: "window", target: "notepad" },
+      },
+      {
+        id: "start-calculator",
+        label: "Calculator",
+        description: "Быстрые расчеты",
+        icon: "/icons/xp/window.png",
+        action: { type: "window", target: "calculator" },
+      },
+    ],
+    [ethfolioAction]
+  );
+
+  const startRight = useMemo<StartMenuItem[]>(
+    () => [
+      {
+        id: "start-docs",
+        label: "My Documents",
+        description: "Файлы пользователя",
+        icon: "/icons/xp/folder.png",
+        action: { type: "window", target: "docs" },
+      },
+      {
+        id: "start-internet",
+        label: "Internet",
+        description: "Сеть и браузер",
+        icon: "/icons/xp/internet.png",
+        action: { type: "window", target: "network" },
+      },
+      {
+        id: "start-computer",
+        label: "My Computer",
+        description: "Системные ресурсы",
+        icon: "/icons/xp/my-computer.png",
+        action: { type: "window", target: "computer" },
+      },
+      {
+        id: "start-network",
+        label: "Network",
+        description: "Сетевые подключения",
+        icon: "/icons/xp/network.png",
+        action: { type: "window", target: "network" },
+      },
+      {
+        id: "start-control",
+        label: "Control Panel",
+        description: "Системные настройки",
+        icon: "/icons/xp/monitor.png",
+        action: { type: "window", target: "control-panel" },
+      },
+      {
+        id: "start-recycle",
+        label: "Recycle Bin",
+        description: "Корзина",
+        icon: "/icons/xp/recycle.png",
+        action: { type: "window", target: "recycle" },
+      },
+      {
+        id: "start-about",
+        label: "About",
+        description: "О программе",
+        icon: "/icons/xp/window.png",
+        action: { type: "window", target: "about" },
+      },
+    ],
+    []
+  );
+
+  const programItems = useMemo<StartMenuItem[]>(
+    () => [
+      {
+        id: "program-ethfolio",
+        label: "Ethfolio",
+        description: "Основное окно",
+        icon: "/icons/xp/eth.svg",
+        action: ethfolioAction,
+      },
+      {
+        id: "program-notepad",
+        label: "Notepad",
+        description: "Заметки",
+        icon: "/icons/xp/docs.png",
+        action: { type: "window", target: "notepad" },
+      },
+      {
+        id: "program-calculator",
+        label: "Calculator",
+        description: "Калькулятор",
+        icon: "/icons/xp/window.png",
+        action: { type: "window", target: "calculator" },
+      },
+      {
+        id: "program-clock",
+        label: "Clock",
+        description: "Часы",
+        icon: "/icons/xp/monitor.png",
+        action: { type: "window", target: "clock" },
+      },
+      {
+        id: "program-control",
+        label: "Control Panel",
+        description: "Системные настройки",
+        icon: "/icons/xp/monitor.png",
+        action: { type: "window", target: "control-panel" },
+      },
+      {
+        id: "program-settings",
+        label: "Settings",
+        description: "Кошелек и интерфейс",
+        icon: "/icons/xp/monitor.png",
+        action: { type: "window", target: "settings" },
+      },
+    ],
+    [ethfolioAction]
+  );
+
+  const taskbarWindows = useMemo(
+    () =>
+      openWindows.map((config) => {
+        const state = windowsMap.get(config.id)!;
+        return {
+          id: config.id,
+          title: config.title,
+          isMinimized: state.isMinimized,
+          icon: config.icon,
+        };
+      }),
+    [openWindows, windowsMap]
+  );
+
+  const handleOpenAccount = useCallback(() => openWindow("account"), [openWindow]);
 
   return (
     <div
       className="desktop-root"
-      onClick={() => {
-        setStartOpen(false);
-        setContextMenu((prev) => ({ ...prev, open: false }));
-      }}
+      onClick={closeMenus}
       onContextMenu={handleContextMenu}
     >
-      <div className="desktop-wallpaper" aria-hidden />
+      <Image
+        className="desktop-wallpaper"
+        src="/wallpapers/windows-xp.jpg"
+        alt=""
+        fill
+        sizes="100vw"
+        priority
+      />
       <OfflineBanner />
       <DesktopIcons icons={icons} onOpenWindow={openWindow} />
       <div className="desktop-windows">
@@ -825,22 +959,7 @@ export default function DesktopShell({
               onClose={closeWindow}
               onMinimize={toggleMinimize}
               onMaximize={toggleMaximize}
-              onRestoreFromMaximize={(id, position, size) => {
-                setWindows((prev) =>
-                  prev.map((item) =>
-                    item.id === id
-                      ? {
-                          ...item,
-                          isMaximized: false,
-                          position,
-                          size,
-                          restore: undefined,
-                          zIndex: ++zCounter.current,
-                        }
-                      : item
-                  )
-                );
-              }}
+              onRestoreFromMaximize={handleRestoreFromMaximize}
               onFocus={focusWindow}
               onPositionChange={updatePosition}
               onSizeChange={updateSize}
@@ -935,29 +1054,23 @@ export default function DesktopShell({
         programItems={programItems}
         onCascade={cascadeWindows}
         onTile={tileWindows}
-        onClose={() => setStartOpen(false)}
+        onClose={closeStart}
         onOpenWindow={openWindow}
         userEmail={userEmail}
       />
       <Taskbar
-        windows={openWindows.map((config) => {
-          const state = windowsMap.get(config.id)!;
-          return {
-            id: config.id,
-            title: config.title,
-            isMinimized: state.isMinimized,
-            icon: config.icon,
-          };
-        })}
+        windows={taskbarWindows}
         activeId={activeId}
         startOpen={startOpen}
-        onToggleStart={() => setStartOpen((prev) => !prev)}
+        onToggleStart={toggleStart}
         onToggleWindow={toggleMinimize}
         onCascade={cascadeWindows}
         onTile={tileWindows}
         userEmail={userEmail ?? undefined}
-        onOpenAccount={() => openWindow("account")}
+        onOpenAccount={handleOpenAccount}
       />
     </div>
   );
 }
+
+export default memo(DesktopShell);

@@ -100,7 +100,8 @@ textarea {
 .desktop-wallpaper {
   position: absolute;
   inset: 0;
-  background: var(--desktop-bg);
+  object-fit: cover;
+  object-position: center;
   pointer-events: none;
 }
 
@@ -149,9 +150,9 @@ textarea {
   width: 48px;
   height: 48px;
   border-radius: 10px;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  object-fit: cover;
+  object-position: center;
+  display: block;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
 }
 
@@ -319,6 +320,8 @@ textarea {
   display: flex;
   flex-direction: column;
   container-type: inline-size;
+  content-visibility: auto;
+  contain-intrinsic-size: 520px 760px;
   background: var(--window-bg);
   border: 2px solid var(--window-border);
   border-radius: 10px;
@@ -676,6 +679,8 @@ textarea {
   padding-bottom: 6px;
   min-width: 0;
   max-width: 100%;
+  content-visibility: auto;
+  contain-intrinsic-size: 320px 1000px;
 }
 
 .table-scroll .xp-table {
@@ -750,9 +755,9 @@ textarea {
   width: 16px;
   height: 16px;
   border-radius: 3px;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  object-fit: cover;
+  object-position: center;
+  display: block;
   flex: 0 0 auto;
 }
 
@@ -819,9 +824,9 @@ textarea {
 .tray-icon-image {
   width: 18px;
   height: 18px;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  object-fit: cover;
+  object-position: center;
+  display: block;
 }
 
 .taskbar-clock {
