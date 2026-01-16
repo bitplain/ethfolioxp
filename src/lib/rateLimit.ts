@@ -1,7 +1,20 @@
 const buckets = new Map<string, { count: number; resetAt: number }>();
+let lastCleanup = 0;
+
+function cleanupBuckets(now: number) {
+  for (const [key, entry] of buckets.entries()) {
+    if (entry.resetAt <= now) {
+      buckets.delete(key);
+    }
+  }
+}
 
 export function rateLimit(key: string, limit: number, windowMs: number) {
   const now = Date.now();
+  if (buckets.size > 1000 || now - lastCleanup >= 60_000) {
+    cleanupBuckets(now);
+    lastCleanup = now;
+  }
   const current = buckets.get(key);
 
   if (!current || current.resetAt <= now) {
@@ -21,3 +34,13 @@ export function rateLimit(key: string, limit: number, windowMs: number) {
     resetAt: current.resetAt,
   };
 }
+
+export const __testing = {
+  clear() {
+    buckets.clear();
+    lastCleanup = 0;
+  },
+  size() {
+    return buckets.size;
+  },
+};
