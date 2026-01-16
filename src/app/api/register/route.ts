@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { rateLimit } from "@/lib/rateLimit";
 import { getClientIp } from "@/lib/request";
+import { roleForFirstUser } from "@/lib/roles";
 import { validateEmail, validatePassword } from "@/lib/validation";
 
 export async function POST(request: Request) {
@@ -40,8 +41,10 @@ export async function POST(request: Request) {
     }
 
     const passwordHash = await hash(password, 12);
+    const userCount = await prisma.user.count();
+    const role = roleForFirstUser(userCount);
     const user = await prisma.user.create({
-      data: { email, passwordHash },
+      data: { email, passwordHash, role },
     });
 
     return NextResponse.json({ ok: true });

@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import TransferPriceOverride from "@/components/TransferPriceOverride";
 import { getJson } from "@/lib/http";
+import { scheduleIdle } from "@/lib/idle";
+import { DEFAULT_TRANSFER_LIMIT } from "@/lib/transferPagination";
 
 type TransferRow = {
   id: string;
@@ -19,7 +21,7 @@ type TransferRow = {
   token: { symbol: string; name: string };
 };
 
-export default function TransferTable({
+function TransferTable({
   initial,
   initialCursor,
 }: {
@@ -29,20 +31,87 @@ export default function TransferTable({
   const [rows, setRows] = useState(initial);
   const [cursor, setCursor] = useState<string | null>(initialCursor);
   const [loading, setLoading] = useState(false);
+  const prefetchRef = useRef<{
+    cursor: string;
+    transfers: TransferRow[];
+    nextCursor: string | null;
+  } | null>(null);
+  const prefetchingRef = useRef(false);
+
+  useEffect(() => {
+    if (!cursor) {
+      prefetchRef.current = null;
+    } else if (prefetchRef.current?.cursor !== cursor) {
+      prefetchRef.current = null;
+    }
+  }, [cursor]);
+
+  useEffect(() => {
+    if (!cursor || loading) {
+      return;
+    }
+    if (prefetchRef.current?.cursor === cursor || prefetchingRef.current) {
+      return;
+    }
+
+    const cancel = scheduleIdle(() => {
+      if (!cursor || prefetchingRef.current) {
+        return;
+      }
+      if (prefetchRef.current?.cursor === cursor) {
+        return;
+      }
+
+      prefetchingRef.current = true;
+      const query = new URLSearchParams({
+        limit: String(DEFAULT_TRANSFER_LIMIT),
+        cursor,
+      });
+
+      getJson(`/api/transfers?${query.toString()}`)
+        .then((result) => {
+          if (result.ok && Array.isArray(result.data.transfers)) {
+            prefetchRef.current = {
+              cursor,
+              transfers: result.data.transfers,
+              nextCursor: result.data.nextCursor ?? null,
+            };
+          }
+        })
+        .finally(() => {
+          prefetchingRef.current = false;
+        });
+    });
+
+    return () => cancel();
+  }, [cursor, loading]);
 
   const loadMore = async () => {
-    if (!cursor) {
+    if (!cursor || loading) {
       return;
     }
     setLoading(true);
-    const query = new URLSearchParams({ limit: "50" });
-    query.set("cursor", cursor);
-    const result = await getJson(`/api/transfers?${query.toString()}`);
-    if (result.ok && Array.isArray(result.data.transfers)) {
-      setRows((prev) => [...prev, ...result.data.transfers]);
-      setCursor(result.data.nextCursor ?? null);
+    try {
+      const prefetched = prefetchRef.current;
+      if (prefetched?.cursor === cursor) {
+        prefetchRef.current = null;
+        setRows((prev) => [...prev, ...prefetched.transfers]);
+        setCursor(prefetched.nextCursor ?? null);
+        return;
+      }
+
+      const query = new URLSearchParams({
+        limit: String(DEFAULT_TRANSFER_LIMIT),
+      });
+      query.set("cursor", cursor);
+      const result = await getJson(`/api/transfers?${query.toString()}`);
+      if (result.ok && Array.isArray(result.data.transfers)) {
+        setRows((prev) => [...prev, ...result.data.transfers]);
+        setCursor(result.data.nextCursor ?? null);
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -111,3 +180,5 @@ export default function TransferTable({
     </div>
   );
 }
+
+export default memo(TransferTable);

@@ -10,6 +10,14 @@ type Options = {
 
 const cache = new Map<string, { expiresAt: number; value: unknown }>();
 
+function pruneCache(now: number) {
+  for (const [key, entry] of cache.entries()) {
+    if (entry.expiresAt <= now) {
+      cache.delete(key);
+    }
+  }
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -25,6 +33,7 @@ export async function fetchJson<T>(url: string, options: Options = {}) {
   const cacheKey = `${method}:${url}`;
 
   if (cacheTtlMs > 0) {
+    pruneCache(Date.now());
     const cached = cache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
       return { ok: true, status: 200, data: cached.value as T, cached: true };
@@ -79,3 +88,12 @@ export async function fetchJson<T>(url: string, options: Options = {}) {
 
   return { ok: false, status: 0, data: {} as T };
 }
+
+export const __testing = {
+  clear() {
+    cache.clear();
+  },
+  size() {
+    return cache.size;
+  },
+};

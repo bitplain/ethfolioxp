@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { decodeCursor, encodeCursor } from "@/lib/pagination";
+import { getTransferLimit } from "@/lib/transferPagination";
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
@@ -11,10 +12,7 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url);
-  const limit = Math.min(
-    100,
-    Math.max(10, Number(url.searchParams.get("limit") || 50))
-  );
+  const limit = getTransferLimit(url.searchParams);
   const cursor = decodeCursor(url.searchParams.get("cursor"));
 
   const where = cursor

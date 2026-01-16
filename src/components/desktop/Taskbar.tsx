@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import { memo, useEffect, useMemo, useState } from "react";
 import { useSettings } from "./SettingsProvider";
 
 export type TaskbarWindow = {
@@ -10,7 +11,7 @@ export type TaskbarWindow = {
   icon?: string;
 };
 
-export default function Taskbar({
+function Taskbar({
   windows,
   activeId,
   startOpen,
@@ -75,10 +76,12 @@ export default function Taskbar({
             }}
           >
             {window.icon ? (
-              <span
+              <Image
                 className="taskbar-icon"
-                style={{ backgroundImage: `url(${window.icon})` }}
-                aria-hidden
+                src={window.icon}
+                alt=""
+                width={16}
+                height={16}
               />
             ) : null}
             <span className="taskbar-title">{window.title}</span>
@@ -139,10 +142,12 @@ export default function Taskbar({
                 onOpenAccount();
               }}
             >
-              <span
+              <Image
                 className="tray-icon-image"
-                style={{ backgroundImage: "url(/icons/xp/user.svg)" }}
-                aria-hidden
+                src="/icons/xp/user.svg"
+                alt=""
+                width={18}
+                height={18}
               />
             </button>
           ) : null}
@@ -152,3 +157,5 @@ export default function Taskbar({
     </div>
   );
 }
+
+export default memo(Taskbar);

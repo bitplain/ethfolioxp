@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import {
   clampWindowBounds,
   WINDOW_MARGIN,
@@ -45,7 +45,7 @@ type WindowProps = {
   children: React.ReactNode;
 };
 
-export default function Window({
+function Window({
   id,
   title,
   subtitle,
@@ -327,3 +327,5 @@ export default function Window({
     </section>
   );
 }
+
+export default memo(Window);

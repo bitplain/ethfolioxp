@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { memo, useState } from "react";
 import { useSettings } from "./SettingsProvider";
 
 export type DesktopIcon = {
@@ -11,7 +11,7 @@ export type DesktopIcon = {
   action: { type: "window"; target: string } | { type: "route"; target: string };
 };
 
-export default function DesktopIcons({
+function DesktopIcons({
   icons,
   onOpenWindow,
 }: {
@@ -67,3 +67,5 @@ export default function DesktopIcons({
     </div>
   );
 }
+
+export default memo(DesktopIcons);

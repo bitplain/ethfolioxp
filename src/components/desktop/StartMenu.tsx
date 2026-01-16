@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { handleLogoutFlow } from "@/lib/authFlow";
@@ -14,7 +14,7 @@ export type StartMenuItem = {
   action: { type: "window"; target: string } | { type: "route"; target: string };
 };
 
-export default function StartMenu({
+function StartMenu({
   open,
   leftItems,
   rightItems,
@@ -212,3 +212,5 @@ export default function StartMenu({
     </div>
   );
 }
+
+export default memo(StartMenu);
