@@ -3,6 +3,7 @@
 import { useState } from "react";
 import TransferPriceOverride from "@/components/TransferPriceOverride";
 import { getJson } from "@/lib/http";
+import { DEFAULT_TRANSFER_LIMIT } from "@/lib/transferPagination";
 
 type TransferRow = {
   id: string;
@@ -35,7 +36,9 @@ export default function TransferTable({
       return;
     }
     setLoading(true);
-    const query = new URLSearchParams({ limit: "50" });
+    const query = new URLSearchParams({
+      limit: String(DEFAULT_TRANSFER_LIMIT),
+    });
     query.set("cursor", cursor);
     const result = await getJson(`/api/transfers?${query.toString()}`);
     if (result.ok && Array.isArray(result.data.transfers)) {
